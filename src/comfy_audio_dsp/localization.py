@@ -7,7 +7,6 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 LOCAL_PATHS = (
     ROOT / "local" / "zh-cn" / "nodes.json",
-    ROOT / "local" / "zh-sn" / "nodes.json",
 )
 
 

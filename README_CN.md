@@ -17,6 +17,9 @@
 `eastmoe -> Comfy-Audio-DSP -> 动态处理`
 `eastmoe -> Comfy-Audio-DSP -> 均衡与滤波`
 `eastmoe -> Comfy-Audio-DSP -> 混响`
+`eastmoe -> Comfy-Audio-DSP -> 延迟与回声`
+`eastmoe -> Comfy-Audio-DSP -> 调制效果`
+`eastmoe -> Comfy-Audio-DSP -> 失真与染色`
 
 ## 动态处理节点
 
@@ -60,6 +63,46 @@
 | Gated Reverb | 门控混响：非线性尾音截断，80 年代风格。 |
 | Reverse Reverb | 反向混响：反转音频、施加混响、再反转，制造膨胀效果。 |
 
+## 延迟与回声节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Simple Delay | 基础延迟：延迟时间、反馈量、干湿混合。 |
+| Tempo-synced Delay | 节拍同步延迟：输入 BPM，选择 1/4、1/8、附点、三连音等时值。 |
+| Ping-Pong Delay | 乒乓延迟：左右声道交替反馈。 |
+| Multi-tap Delay | 多拍点延迟：6 个独立拍点，每个可设置时间和增益。 |
+| Dub Delay | 磁带/BBD 风格 Dub 延迟：低通染色、反馈和哇音颤动。 |
+| Filtered Delay | 带滤波延迟：延迟信号带高通/低通滤波。 |
+| Stereo Spread Delay | 扩散延迟：左右声道微小时差制造立体声宽度。 |
+
+## 调制效果节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Chorus | 合唱：多声音轻微延迟调制、深度、速率、反馈。 |
+| Flanger | 镶边：短延迟、反馈、LFO 调制延迟时间。 |
+| Phaser | 移相器：全通滤波器级联 + LFO，级数可调。 |
+| Tremolo | 震音：振幅 LFO 调制，可选正弦、三角、方波。 |
+| Vibrato | 颤音：小范围音高/延迟调制。 |
+| Rotary Speaker (Leslie) | 旋转扬声器：低音转鼓和高音号角独立速度调制。 |
+| Ring Modulator | 环形调制：信号与载波相乘，产生金属质感。 |
+| Auto Panner | 自动声像：LFO 调制左右声像位置。 |
+| Uni-vibe | 复古光耦合移相/合唱风格效果。 |
+
+## 失真与染色节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Soft Clipper | 软削波：使用 tanh 或三次曲线模拟温和过载。 |
+| Hard Clipper | 硬削波：按阈值直接截幅。 |
+| Tube Saturation | 电子管饱和：非对称波形塑形、偶次谐波。 |
+| Tape Saturation | 磁带饱和：压缩、频响变化和轻微哇音。 |
+| Fuzz | 法兹失真：强烈、近似方形削波。 |
+| Bit Crusher | 比特粉碎：降低量化位数和采样保持分辨率。 |
+| Overdrive / Distortion | 过载/失真：增益、音色控制、混合。 |
+| Wavefolder | 波折器：折叠波形产生复杂谐波。 |
+| Exciter / Enhancer | 激励器：生成高频谐波增加亮度。 |
+
 ## 目录结构
 
 ```text
@@ -79,5 +122,8 @@ DSP 实现已按分类拆分：
 
 - `common.py`：音频张量、滤波、包络、电平和干湿混合等公共工具。
 - `dynamics.py`：压缩、限制、噪声门、扩展、齿音消除、多段压缩、自动增益和响度处理。
+- `delay.py`：延迟与回声处理。
 - `equalizers.py`：均衡与滤波处理。
+- `modulation.py`：合唱、镶边、移相、震音、颤音、旋转扬声器、环形调制、声像和 Uni-vibe。
 - `reverb.py`：卷积混响、算法混响、门控混响和反向混响。
+- `saturation.py`：削波、饱和、法兹、比特粉碎、过载、波折和激励器。

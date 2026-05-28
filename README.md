@@ -17,6 +17,9 @@ Right-click menu:
 `eastmoe -> Comfy-Audio-DSP -> Dynamics`
 `eastmoe -> Comfy-Audio-DSP -> Equalizers & Filters`
 `eastmoe -> Comfy-Audio-DSP -> Reverb`
+`eastmoe -> Comfy-Audio-DSP -> Delay & Echo`
+`eastmoe -> Comfy-Audio-DSP -> Modulation`
+`eastmoe -> Comfy-Audio-DSP -> Distortion & Saturation`
 
 ## Dynamics Nodes
 
@@ -60,6 +63,46 @@ Right-click menu:
 | Gated Reverb | Nonlinear gated tail cutoff for 1980s-style ambience. |
 | Reverse Reverb | Reverse audio, apply reverb, then reverse back for swelling effects. |
 
+## Delay & Echo Nodes
+
+| Node | Summary |
+| --- | --- |
+| Simple Delay | Basic delay with time, feedback, and dry/wet mix. |
+| Tempo-synced Delay | BPM and note-value delay times, including dotted and triplet values. |
+| Ping-Pong Delay | Alternating left/right feedback delay. |
+| Multi-tap Delay | Six independent delay taps with time and gain controls. |
+| Dub Delay | Tape/BBD-style delay with low-pass tone and wow/flutter. |
+| Filtered Delay | Delay with high-pass and low-pass filtering. |
+| Stereo Spread Delay | Small left/right delay offsets for stereo width. |
+
+## Modulation Nodes
+
+| Node | Summary |
+| --- | --- |
+| Chorus | Multi-voice modulated delay with depth, rate, feedback, and mix. |
+| Flanger | Short LFO-modulated delay with feedback. |
+| Phaser | Cascaded all-pass phaser with selectable stages. |
+| Tremolo | Amplitude LFO modulation with sine, triangle, or square waves. |
+| Vibrato | Small pitch modulation using fractional delay. |
+| Rotary Speaker (Leslie) | Split-band rotary speaker approximation with low/high speeds. |
+| Ring Modulator | Carrier oscillator multiplication for metallic sidebands. |
+| Auto Panner | LFO-controlled stereo panning. |
+| Uni-vibe | Vintage optical phaser/chorus-style modulation. |
+
+## Distortion & Saturation Nodes
+
+| Node | Summary |
+| --- | --- |
+| Soft Clipper | tanh or cubic soft clipping. |
+| Hard Clipper | Threshold-based hard clipping. |
+| Tube Saturation | Asymmetric waveshaping for even harmonics. |
+| Tape Saturation | Tape-style drive, compression, tone shaping, and wow. |
+| Fuzz | Aggressive square-like clipping. |
+| Bit Crusher | Lower bit depth and sample-rate resolution. |
+| Overdrive / Distortion | Drive, tone, mode, output gain, and mix. |
+| Wavefolder | Wavefolding for complex harmonics. |
+| Exciter / Enhancer | Generates high-frequency harmonics for brightness. |
+
 ## Repository Layout
 
 ```text
@@ -80,5 +123,8 @@ The DSP implementation is split by category:
 
 - `common.py`: shared audio tensor, filtering, metering, and mix helpers.
 - `dynamics.py`: compressor, limiter, gate, expander, de-esser, multiband, gain, and loudness processors.
+- `delay.py`: delay and echo processors.
 - `equalizers.py`: equalizer and filter processors.
+- `modulation.py`: chorus, flanger, phaser, tremolo, vibrato, rotary, ring modulation, panning, and Uni-vibe processors.
 - `reverb.py`: convolution, algorithmic, gated, and reverse reverbs.
+- `saturation.py`: clipping, saturation, fuzz, bit crushing, overdrive, wavefolding, and exciter processors.
