@@ -1,0 +1,36 @@
+{
+  "category": "eastmoe/Comfy-Audio-DSP",
+  "node_display_names": {
+    "ComfyAudioDSPCompressor": "压缩器",
+    "ComfyAudioDSPLimiter": "砖墙限制器",
+    "ComfyAudioDSPNoiseGate": "噪声门",
+    "ComfyAudioDSPExpander": "向下扩展器",
+    "ComfyAudioDSPTransientShaper": "瞬态塑形器",
+    "ComfyAudioDSPDeEsser": "嘶声消除器",
+    "ComfyAudioDSPMultiBandCompressor": "多段压缩器",
+    "ComfyAudioDSPAutoGainLeveler": "自动增益 / 电平器",
+    "ComfyAudioDSPLoudnessNormalizer": "响度标准化器 (LUFS)"
+  },
+  "descriptions": {
+    "ComfyAudioDSPCompressor": "使用阈值、比率、启动、释放、膝宽与补偿增益控制动态范围。",
+    "ComfyAudioDSPLimiter": "砖墙限制器，用阈值、释放和前瞻防止削波。",
+    "ComfyAudioDSPNoiseGate": "低于阈值时按启动、保持、释放和衰减范围关闭噪声门。",
+    "ComfyAudioDSPExpander": "降低低电平信号，使背景噪声和尾音更安静。",
+    "ComfyAudioDSPTransientShaper": "独立控制 Attack 与 Sustain 的增益。",
+    "ComfyAudioDSPDeEsser": "针对 4-10 kHz 等指定频段进行压缩以降低嘶声。",
+    "ComfyAudioDSPMultiBandCompressor": "将音频拆成 3 或 4 段，并为各频段设置独立阈值、比率和补偿增益。",
+    "ComfyAudioDSPAutoGainLeveler": "按 RMS 或峰值检测自动匹配目标电平。",
+    "ComfyAudioDSPLoudnessNormalizer": "按近似 EBU R128 的整体、短时或瞬时 LUFS 测量归一化响度。"
+  },
+  "return_names": {
+    "ComfyAudioDSPCompressor": ["音频"],
+    "ComfyAudioDSPLimiter": ["音频"],
+    "ComfyAudioDSPNoiseGate": ["音频"],
+    "ComfyAudioDSPExpander": ["音频"],
+    "ComfyAudioDSPTransientShaper": ["音频"],
+    "ComfyAudioDSPDeEsser": ["音频"],
+    "ComfyAudioDSPMultiBandCompressor": ["音频"],
+    "ComfyAudioDSPAutoGainLeveler": ["音频"],
+    "ComfyAudioDSPLoudnessNormalizer": ["音频"]
+  }
+}
