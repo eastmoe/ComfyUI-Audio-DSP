@@ -27,6 +27,10 @@
 `eastmoe -> Comfy-Audio-DSP -> 信号发生器`
 `eastmoe -> Comfy-Audio-DSP -> 路由与混音`
 `eastmoe -> Comfy-Audio-DSP -> 实用工具`
+`eastmoe -> Comfy-Audio-DSP -> 频谱域处理`
+`eastmoe -> Comfy-Audio-DSP -> 模块化调制源`
+`eastmoe -> Comfy-Audio-DSP -> 音频修复`
+`eastmoe -> Comfy-Audio-DSP -> 工作流集成`
 
 ## 动态处理节点
 
@@ -64,6 +68,16 @@
 | Hum Remover | 去嗡嗡声：自动或固定 50/60 Hz 及谐波陷波。 |
 | Linear Phase EQ | 线性相位 EQ：零相位 FFT 幅度塑形。 |
 | Comb Filter | 梳状滤波器：前馈/反馈梳状滤波。 |
+
+## 频谱域处理节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Spectral Gate | 频谱门：基于 FFT bin 的噪声门。 |
+| Spectral Freeze | 频谱冻结：冻结指定 FFT 帧生成持续音色。 |
+| Frequency Shifter | 线性频移：不同于变调，整体平移频率。 |
+| Spectral Blur | 频谱模糊：在频率/时间轴上模糊音色。 |
+| Spectral Noise Reduction | 频谱降噪：根据开头噪声轮廓做频谱减法。 |
 
 ## 混响节点
 
@@ -109,6 +123,15 @@
 | Vocoder | 声码器：用调制信号包络塑形载波滤波器组。 |
 | Barberpole Flanger | Barberpole 镶边：连续上升或下降的无限镶边错觉。 |
 | Auto-Filter | 自动滤波器：LFO 控制滤波器扫动。 |
+
+## 模块化调制源节点
+
+| 节点 | 功能 |
+| --- | --- |
+| LFO Source | 独立 LFO：输出可共享的音频速率控制信号。 |
+| ADSR Envelope Generator | ADSR 包络发生器：用于参数自动化。 |
+| Sample & Hold | 采样保持：随机步进调制源。 |
+| Step Sequencer | 步进序列器：按 BPM 输出参数序列。 |
 
 ## 失真与染色节点
 
@@ -236,6 +259,22 @@
 | Phase Rotator / All-Pass Filter | 相位旋转/全通滤波：改变相位而尽量不改变幅度。 |
 | Math / Signal Mixer | 数学/信号混算：对最多 4 路音频执行安全逐样本公式。 |
 
+## 音频修复节点
+
+| 节点 | 功能 |
+| --- | --- |
+| De-Clip | 削波修复：插值修复短时过载区域。 |
+| De-Reverb | 去混响：用 STFT 尾音抑制减少房间混响。 |
+| Bandwidth Extension | 带宽扩展：合成高频泛音补全带宽。 |
+
+## 工作流集成节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Audio Feature to Text | 音频特征转文本：输出 BPM、调性、响度和音色描述。 |
+| Beat Slicer | 节拍切片器：按瞬态生成切片时间段。 |
+| Audio Quality Estimator | 音频质量估算器：输出质量分数和明细。 |
+
 ## 目录结构
 
 ```text
@@ -262,8 +301,11 @@ DSP 实现已按分类拆分：
 - `modulation.py`：合唱、镶边、移相、震音、颤音、旋转扬声器、环形调制、声像和 Uni-vibe。
 - `pitch_time.py`：变调、时间伸缩、和声、音高修正、经典重采样和变速播放。
 - `reverb.py`：卷积混响、算法混响、门控混响和反向混响。
+- `restoration.py`：削波修复、去混响和带宽扩展。
 - `routing.py`：混音、选择、拆分、合并、交叉淡化、侧链和发送/返回。
 - `saturation.py`：削波、饱和、法兹、比特粉碎、过载、波折和激励器。
 - `stereo.py`：声像、立体声宽度、Mid/Side、Haas 增强、声道交换和低频单声道化。
 - `spatial.py`：双耳声像、可选 SOFA HRTF、一阶 Ambisonics、距离和多普勒处理。
+- `spectral.py`：频谱门、冻结、模糊、频移和频谱降噪。
 - `utilities.py`：增益、极性、直流偏移、淡化、裁剪、归一化、重采样、格式、信息、延迟、循环和反转工具。
+- `workflow.py`：音频特征文本、节拍切片和质量估算。

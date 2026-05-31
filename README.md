@@ -27,6 +27,10 @@ Right-click menu:
 `eastmoe -> Comfy-Audio-DSP -> Signal Generators`
 `eastmoe -> Comfy-Audio-DSP -> Routing & Mixing`
 `eastmoe -> Comfy-Audio-DSP -> Utilities`
+`eastmoe -> Comfy-Audio-DSP -> Spectral Processing`
+`eastmoe -> Comfy-Audio-DSP -> Modulation Sources`
+`eastmoe -> Comfy-Audio-DSP -> Audio Restoration`
+`eastmoe -> Comfy-Audio-DSP -> Workflow Integration`
 
 ## Dynamics Nodes
 
@@ -64,6 +68,16 @@ Right-click menu:
 | Hum Remover | Auto or fixed 50/60 Hz hum removal with harmonic notch filters. |
 | Linear Phase EQ | Zero-phase FFT EQ for linear-phase-style magnitude shaping. |
 | Comb Filter | Feedforward/feedback comb filtering. |
+
+## Spectral Processing Nodes
+
+| Node | Summary |
+| --- | --- |
+| Spectral Gate | FFT-bin noise gate with threshold, reduction, and smoothing. |
+| Spectral Freeze | Freezes one FFT frame into a sustained texture. |
+| Frequency Shifter | Linear frequency shift, separate from musical pitch shifting. |
+| Spectral Blur | Blurs STFT magnitudes across frequency and time. |
+| Spectral Noise Reduction | Noise-profile spectral subtraction from the start of the clip. |
 
 ## Reverb Nodes
 
@@ -109,6 +123,15 @@ Right-click menu:
 | Vocoder | Filter-bank vocoder using a modulator envelope to shape a carrier. |
 | Barberpole Flanger | Continuously rising or falling flanger illusion. |
 | Auto-Filter | LFO-controlled filter sweep. |
+
+## Modulation Sources Nodes
+
+| Node | Summary |
+| --- | --- |
+| LFO Source | Shared audio-rate LFO control signal. |
+| ADSR Envelope Generator | ADSR envelope as reusable parameter automation. |
+| Sample & Hold | Random stepped modulation source. |
+| Step Sequencer | BPM-synced value sequence control signal. |
 
 ## Distortion & Saturation Nodes
 
@@ -236,6 +259,22 @@ Right-click menu:
 | Phase Rotator / All-Pass Filter | Adjustable all-pass phase rotation without intentional magnitude change. |
 | Math / Signal Mixer | Safe sample-wise formula over up to four audio inputs. |
 
+## Audio Restoration Nodes
+
+| Node | Summary |
+| --- | --- |
+| De-Clip | Interpolates short clipped regions. |
+| De-Reverb | STFT tail suppression for reducing room reverb. |
+| Bandwidth Extension | Synthesizes high-frequency harmonics above a crossover. |
+
+## Workflow Integration Nodes
+
+| Node | Summary |
+| --- | --- |
+| Audio Feature to Text | BPM, key, loudness, and timbre metadata as prompt text. |
+| Beat Slicer | Transient-based slice ranges for workflow scheduling. |
+| Audio Quality Estimator | No-reference or optional-reference quality score and details. |
+
 ## Repository Layout
 
 ```text
@@ -263,8 +302,11 @@ The DSP implementation is split by category:
 - `modulation.py`: chorus, flanger, phaser, tremolo, vibrato, rotary, ring modulation, panning, and Uni-vibe processors.
 - `pitch_time.py`: pitch shifting, time stretching, harmonizing, correction, classic resampling, and varispeed processors.
 - `reverb.py`: convolution, algorithmic, gated, and reverse reverbs.
+- `restoration.py`: de-clip, de-reverb, and bandwidth-extension repair tools.
 - `routing.py`: mixing, selection, splitting, merging, crossfading, sidechain, and send/return processors.
 - `saturation.py`: clipping, saturation, fuzz, bit crushing, overdrive, wavefolding, and exciter processors.
 - `stereo.py`: panning, stereo width, Mid/Side tools, Haas widening, channel swap, and mono-maker processors.
 - `spatial.py`: binaural panning, optional SOFA HRTF convolution, first-order Ambisonics, distance, and Doppler processors.
+- `spectral.py`: STFT spectral gates, freeze, blur, shifting, and noise reduction.
 - `utilities.py`: gain, polarity, DC removal, fades, trim, normalize, resample, format, info, delay, loop, and reverse tools.
+- `workflow.py`: audio feature text, beat slicing, and quality estimation for workflow routing.

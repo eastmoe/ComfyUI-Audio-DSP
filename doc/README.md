@@ -18,3 +18,7 @@ Implemented groups are available in the ComfyUI right-click menu under
 - Signal Generators
 - Routing & Mixing
 - Utilities
+- Spectral Processing
+- Modulation Sources
+- Audio Restoration
+- Workflow Integration

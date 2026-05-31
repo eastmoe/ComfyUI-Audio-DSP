@@ -8,6 +8,7 @@ import torch
 from .common import audio_waveform, ba_filter_waveform, butter_sos, clamp01, copy_audio, db_to_amp, meter_envelope, mix_audio, sos_filter_waveform
 
 WAVEFORMS = ["sine", "triangle", "square"]
+MOD_SOURCE_WAVEFORMS = ["sine", "triangle", "square", "saw", "random"]
 AUTO_FILTER_TYPES = ["low_pass", "high_pass", "band_pass"]
 
 
@@ -26,7 +27,96 @@ def _lfo(length: int, sample_rate: int, rate_hz: float, waveform: str = "sine", 
         return (4.0 * np.abs(phase_value - 0.5) - 1.0).astype(np.float32)
     if waveform == "square":
         return np.where(phase_value < 0.5, 1.0, -1.0).astype(np.float32)
+    if waveform == "saw":
+        return (phase_value * 2.0 - 1.0).astype(np.float32)
+    if waveform == "random":
+        steps = np.floor(phase_value * max(float(rate_hz), 1.0)).astype(np.int64)
+        rng = np.random.default_rng(0)
+        values = rng.uniform(-1.0, 1.0, int(np.max(steps)) + 2).astype(np.float32)
+        return values[steps]
     return np.sin(2.0 * math.pi * phase_value).astype(np.float32)
+
+
+def _control_audio(values: np.ndarray, sample_rate: int) -> dict:
+    tensor = torch.from_numpy(values.astype(np.float32, copy=False)).view(1, 1, -1)
+    return {"waveform": tensor, "sample_rate": int(sample_rate)}
+
+
+def _control_summary(values: np.ndarray, points: int) -> str:
+    count = max(4, min(int(points), 1024))
+    if values.shape[-1] > count:
+        indices = np.linspace(0, values.shape[-1] - 1, count).astype(int)
+        sampled = values[indices]
+    else:
+        sampled = values
+    return "[" + ",".join(f"{float(v):.6g}" for v in sampled.tolist()) + "]"
+
+
+def lfo_source(rate_hz: float, depth: float, offset: float, waveform_shape: str, duration_s: float, sample_rate: int, points: int) -> tuple[dict, float, str]:
+    length = max(1, int(round(float(duration_s) * int(sample_rate))))
+    values = float(offset) + clamp01(depth) * _lfo(length, int(sample_rate), rate_hz, waveform_shape)
+    return _control_audio(values, int(sample_rate)), float(values[0]), _control_summary(values, points)
+
+
+def adsr_envelope_generator(attack_ms: float, decay_ms: float, sustain_level: float, release_ms: float, gate_s: float, duration_s: float, sample_rate: int, points: int) -> tuple[dict, float, str]:
+    sample_rate = int(sample_rate)
+    length = max(1, int(round(float(duration_s) * sample_rate)))
+    values = np.zeros(length, dtype=np.float32)
+    attack = max(0, int(round(float(attack_ms) * sample_rate / 1000.0)))
+    decay = max(0, int(round(float(decay_ms) * sample_rate / 1000.0)))
+    release = max(0, int(round(float(release_ms) * sample_rate / 1000.0)))
+    gate = min(length, max(0, int(round(float(gate_s) * sample_rate))))
+    sustain = clamp01(sustain_level)
+    cursor = 0
+    if attack > 0:
+        end = min(length, attack)
+        values[:end] = np.linspace(0.0, 1.0, end, endpoint=False, dtype=np.float32)
+        cursor = end
+    elif length > 0:
+        values[0] = 1.0
+    if decay > 0 and cursor < gate:
+        end = min(gate, cursor + decay)
+        values[cursor:end] = np.linspace(1.0, sustain, end - cursor, endpoint=False, dtype=np.float32)
+        cursor = end
+    if cursor < gate:
+        values[cursor:gate] = sustain
+    start_level = float(values[gate - 1]) if gate > 0 else 0.0
+    if release > 0 and gate < length:
+        end = min(length, gate + release)
+        values[gate:end] = np.linspace(start_level, 0.0, end - gate, endpoint=False, dtype=np.float32)
+    return _control_audio(values, sample_rate), float(values[0]), _control_summary(values, points)
+
+
+def sample_and_hold(rate_hz: float, smoothing: float, seed: int, duration_s: float, sample_rate: int, points: int) -> tuple[dict, float, str]:
+    sample_rate = int(sample_rate)
+    length = max(1, int(round(float(duration_s) * sample_rate)))
+    step = max(1, int(round(sample_rate / max(float(rate_hz), 0.01))))
+    rng = np.random.default_rng(int(seed))
+    held = np.repeat(rng.uniform(0.0, 1.0, int(math.ceil(length / step)) + 1).astype(np.float32), step)[:length]
+    if smoothing > 0.0:
+        size = max(1, int(round(step * clamp01(smoothing))))
+        kernel = np.hanning(size * 2 + 1).astype(np.float32)
+        kernel /= max(float(np.sum(kernel)), 1.0e-8)
+        held = np.convolve(held, kernel, mode="same").astype(np.float32)
+    return _control_audio(held, sample_rate), float(held[0]), _control_summary(held, points)
+
+
+def step_sequencer(sequence: str, bpm: float, step_value: str, glide: float, duration_s: float, sample_rate: int, points: int) -> tuple[dict, float, str]:
+    sample_rate = int(sample_rate)
+    length = max(1, int(round(float(duration_s) * sample_rate)))
+    raw = [part.strip() for part in sequence.replace(";", ",").split(",") if part.strip()]
+    steps = np.asarray([float(part) for part in raw] or [0.0], dtype=np.float32)
+    divisions = {"1/1": 4.0, "1/2": 2.0, "1/4": 1.0, "1/8": 0.5, "1/16": 0.25}
+    beats = divisions.get(step_value, 0.25)
+    step_samples = max(1, int(round(60.0 / max(float(bpm), 1.0) * beats * sample_rate)))
+    values = np.repeat(steps, step_samples)
+    values = np.resize(values, length).astype(np.float32)
+    if glide > 0.0:
+        size = max(1, int(round(step_samples * clamp01(glide))))
+        kernel = np.hanning(size * 2 + 1).astype(np.float32)
+        kernel /= max(float(np.sum(kernel)), 1.0e-8)
+        values = np.convolve(values, kernel, mode="same").astype(np.float32)
+    return _control_audio(values, sample_rate), float(values[0]), _control_summary(values, points)
 
 
 def _fractional_delay(x: np.ndarray, delays: np.ndarray) -> np.ndarray:
