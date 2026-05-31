@@ -57,6 +57,9 @@ Right-click menu:
 | Tilt EQ | Tilts around a pivot frequency, raising highs while lowering lows or the reverse. |
 | RIAA EQ | RIAA phono de-emphasis/playback or pre-emphasis. |
 | High Pass / Low Pass with Resonance | Resonant synth-style high-pass or low-pass filter with optional drive. |
+| Dynamic EQ | Single-band threshold/ratio-controlled EQ for dynamic resonance cuts or boosts. |
+| Spectral Smoothing / Contrast | STFT spectral envelope smoothing or contrast enhancement. |
+| Hum Remover | Auto or fixed 50/60 Hz hum removal with harmonic notch filters. |
 
 ## Reverb Nodes
 
@@ -95,6 +98,7 @@ Right-click menu:
 | Ring Modulator | Carrier oscillator multiplication for metallic sidebands. |
 | Auto Panner | LFO-controlled stereo panning. |
 | Uni-vibe | Vintage optical phaser/chorus-style modulation. |
+| Vocoder | Filter-bank vocoder using a modulator envelope to shape a carrier. |
 
 ## Distortion & Saturation Nodes
 
@@ -120,6 +124,7 @@ Right-click menu:
 | Harmonizer | Generates up to four fixed-interval harmony voices. |
 | Pitch Correction (Auto-Tune style) | Monophonic pitch correction to a selected key and scale. |
 | Varispeed Player | Varispeed playback with linked speed, pitch, and duration. |
+| Granular Processor | Windowed grains with pitch, jitter, scatter, and reverse probability. |
 
 ## Stereo Imaging Nodes
 
@@ -185,6 +190,7 @@ Right-click menu:
 | Crossfader | Equal-power or linear crossfade between two inputs. |
 | Sidechain Gate / Compressor | Uses external sidechain key input. |
 | Send/Return Loop | Dry/return blend for effect-send workflows. |
+| Multiband Crossover | Splits audio into 3 or 4 frequency bands for parallel processing. |
 
 ## Utilities Nodes
 
@@ -203,6 +209,10 @@ Right-click menu:
 | Delay Compensation | Adds manual sample/ms delay. |
 | Loop / Duplicator | Repeats by loop count or target duration. |
 | Reverse Audio | Reverses playback direction. |
+| Envelope Follower Output | Attack/release envelope as scalar, text points, and audio-rate control signal. |
+| Declick / Decrackle | Median-based repair for short impulse clicks and crackle. |
+| Phase Rotator / All-Pass Filter | Adjustable all-pass phase rotation without intentional magnitude change. |
+| Math / Signal Mixer | Safe sample-wise formula over up to four audio inputs. |
 
 ## Repository Layout
 

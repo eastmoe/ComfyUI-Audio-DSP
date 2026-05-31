@@ -127,7 +127,17 @@
     "ComfyAudioDSPAudioInfo": "音频信息",
     "ComfyAudioDSPDelayCompensation": "延迟补偿",
     "ComfyAudioDSPLoopDuplicator": "循环 / 重复器",
-    "ComfyAudioDSPReverseAudio": "反转音频"
+    "ComfyAudioDSPReverseAudio": "反转音频",
+    "ComfyAudioDSPDynamicEQ": "动态 EQ",
+    "ComfyAudioDSPVocoder": "声码器",
+    "ComfyAudioDSPEnvelopeFollowerOutput": "包络跟随器输出",
+    "ComfyAudioDSPMultibandCrossover": "多频段分频器",
+    "ComfyAudioDSPDeclickDecrackle": "去咔嗒 / 去噼啪",
+    "ComfyAudioDSPSpectralSmoothingContrast": "频谱抹平 / 对比增强",
+    "ComfyAudioDSPHumRemover": "去嗡嗡声",
+    "ComfyAudioDSPPhaseRotatorAllpass": "相位旋转器 / 全通滤波器",
+    "ComfyAudioDSPGranularProcessor": "颗粒处理器",
+    "ComfyAudioDSPMathSignalMixer": "数学运算 / 信号混算"
   },
   "descriptions": {
     "ComfyAudioDSPCompressor": "使用阈值、比率、启动、释放、膝宽、补偿增益、检测方式与干湿混合控制动态范围。",
@@ -240,7 +250,17 @@
     "ComfyAudioDSPAudioInfo": "输出采样率、时长、声道数、采样数和元数据文本。",
     "ComfyAudioDSPDelayCompensation": "手动添加采样点或毫秒延迟用于并行链路对齐。",
     "ComfyAudioDSPLoopDuplicator": "将音频循环指定次数或重复到目标时长。",
-    "ComfyAudioDSPReverseAudio": "反转音频播放方向。"
+    "ComfyAudioDSPReverseAudio": "反转音频播放方向。",
+    "ComfyAudioDSPDynamicEQ": "频段增益随输入电平变化，适合只在共振过强时衰减或动态增强基频。",
+    "ComfyAudioDSPVocoder": "用调制信号的频谱包络控制载波滤波器组，生成经典机器人声。",
+    "ComfyAudioDSPEnvelopeFollowerOutput": "提取音频幅度包络，并输出标量、采样点列表和音频速率控制信号。",
+    "ComfyAudioDSPMultibandCrossover": "将音频拆分为 3 或 4 个频段，便于并行处理后再混合。",
+    "ComfyAudioDSPDeclickDecrackle": "检测短时脉冲噪声，并用中值插值修复咔嗒声或噼啪声。",
+    "ComfyAudioDSPSpectralSmoothingContrast": "对频谱包络进行平滑或对比增强，类似音频版 unsharp mask。",
+    "ComfyAudioDSPHumRemover": "自动检测或指定 50/60 Hz 工频，并对谐波施加陷波滤波。",
+    "ComfyAudioDSPPhaseRotatorAllpass": "使用可调全通滤波改变相位而尽量不改变幅度。",
+    "ComfyAudioDSPGranularProcessor": "将音频切成微小颗粒，并按抖动、散布、音高和反转概率重放。",
+    "ComfyAudioDSPMathSignalMixer": "对最多 4 路音频 A-D 执行安全的逐样本数学表达式。"
   },
   "return_names": {
     "ComfyAudioDSPCompressor": ["音频"],
@@ -353,7 +373,17 @@
     "ComfyAudioDSPAudioInfo": ["音频", "采样率", "时长 s", "声道数", "采样数", "信息"],
     "ComfyAudioDSPDelayCompensation": ["音频"],
     "ComfyAudioDSPLoopDuplicator": ["音频"],
-    "ComfyAudioDSPReverseAudio": ["音频"]
+    "ComfyAudioDSPReverseAudio": ["音频"],
+    "ComfyAudioDSPDynamicEQ": ["音频"],
+    "ComfyAudioDSPVocoder": ["音频"],
+    "ComfyAudioDSPEnvelopeFollowerOutput": ["音频", "当前值", "平均值", "包络点", "包络音频"],
+    "ComfyAudioDSPMultibandCrossover": ["低频", "低中频", "高中频", "高频"],
+    "ComfyAudioDSPDeclickDecrackle": ["音频"],
+    "ComfyAudioDSPSpectralSmoothingContrast": ["音频"],
+    "ComfyAudioDSPHumRemover": ["音频"],
+    "ComfyAudioDSPPhaseRotatorAllpass": ["音频"],
+    "ComfyAudioDSPGranularProcessor": ["音频"],
+    "ComfyAudioDSPMathSignalMixer": ["音频"]
   },
   "ui": {
     "common": {
@@ -514,7 +544,28 @@
       "target_sample_rate": {"display_name": "目标采样率", "tooltip": "重采样后的采样率。"},
       "delay_samples": {"display_name": "延迟采样点", "tooltip": "添加的样本级延迟。"},
       "loops": {"display_name": "循环次数", "tooltip": "重复音频的次数。"},
-      "target_duration_s": {"display_name": "目标时长 s", "tooltip": "重复到指定时长，0 表示按循环次数。"}
+      "target_duration_s": {"display_name": "目标时长 s", "tooltip": "重复到指定时长，0 表示按循环次数。"},
+      "low_hz": {"display_name": "低频下限 Hz", "tooltip": "滤波器组或处理范围的低频边界。"},
+      "high_hz": {"display_name": "高频上限 Hz", "tooltip": "滤波器组或处理范围的高频边界。"},
+      "carrier": {"display_name": "载波音频", "tooltip": "被频谱包络塑形的载波信号。"},
+      "modulator": {"display_name": "调制音频", "tooltip": "提供频谱包络的调制信号。"},
+      "modulator_gain_db": {"display_name": "调制增益 dB", "tooltip": "调制包络进入声码器前的增益。"},
+      "carrier_gain_db": {"display_name": "载波增益 dB", "tooltip": "声码器输出补偿增益。"},
+      "points": {"display_name": "输出点数", "tooltip": "文本包络列表中采样的点数。"},
+      "frequency_smoothing_bins": {"display_name": "频率平滑 bins", "tooltip": "频谱包络平滑的频率 bin 宽度。"},
+      "base_mode": {"display_name": "基频模式", "tooltip": "自动检测或固定 50/60 Hz 工频。"},
+      "max_harmonics": {"display_name": "最大谐波数", "tooltip": "去嗡声处理的谐波数量。"},
+      "reduction_db": {"display_name": "衰减 dB", "tooltip": "陷波处理的最大衰减量。"},
+      "grain_ms": {"display_name": "颗粒长度 ms", "tooltip": "每个颗粒的时长。"},
+      "overlap": {"display_name": "重叠倍数", "tooltip": "颗粒之间的重叠密度。"},
+      "pitch_semitones": {"display_name": "音高半音", "tooltip": "颗粒重放的音高偏移。"},
+      "position_jitter_ms": {"display_name": "位置抖动 ms", "tooltip": "颗粒读取位置的随机抖动范围。"},
+      "time_scatter": {"display_name": "时间散布", "tooltip": "颗粒重排/打散程度。"},
+      "reverse_probability": {"display_name": "反转概率", "tooltip": "每个颗粒被反向播放的概率。"},
+      "expression": {"display_name": "表达式", "tooltip": "逐样本公式，可使用 A/B/C/D、t、pi 和 sin/cos/tanh 等函数。"},
+      "audio_c": {"display_name": "音频 C", "tooltip": "公式混算输入 C。"},
+      "audio_d": {"display_name": "音频 D", "tooltip": "公式混算输入 D。"},
+      "window_samples": {"display_name": "窗口采样点", "tooltip": "中值修复窗口大小，建议为奇数。"}
     },
     "multiband_compressor": {
       "crossover_low_hz": {"display_name": "低/中分频 Hz", "tooltip": "低频与中频之间的分频点。"},

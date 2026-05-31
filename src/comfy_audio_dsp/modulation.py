@@ -5,7 +5,7 @@ import math
 import numpy as np
 import torch
 
-from .common import audio_waveform, ba_filter_waveform, butter_sos, clamp01, copy_audio, db_to_amp, mix_audio, sos_filter_waveform
+from .common import audio_waveform, ba_filter_waveform, butter_sos, clamp01, copy_audio, db_to_amp, meter_envelope, mix_audio, sos_filter_waveform
 
 WAVEFORMS = ["sine", "triangle", "square"]
 
@@ -162,3 +162,51 @@ def uni_vibe(audio: dict, rate_hz: float, depth: float, chorus_mix: float, mix: 
     chorused = chorus(phased, 2, 7.0, 2.5 * clamp01(depth), rate_hz, 0.05, chorus_mix)
     waveform, _sample_rate = audio_waveform(audio)
     return copy_audio(audio, mix_audio(waveform, chorused["waveform"], mix))
+
+
+def _match_modulator(modulator: dict, sample_rate: int, length: int, channels: int, like: torch.Tensor) -> torch.Tensor:
+    waveform, mod_rate = audio_waveform(modulator)
+    if mod_rate != sample_rate:
+        raise ValueError("Comfy-Audio-DSP: vocoder carrier and modulator must have matching sample rates.")
+    if waveform.shape[-1] < length:
+        waveform = torch.nn.functional.pad(waveform, (0, length - waveform.shape[-1]))
+    elif waveform.shape[-1] > length:
+        waveform = waveform[..., :length]
+    if waveform.shape[1] < channels:
+        waveform = waveform.repeat(1, int(math.ceil(channels / waveform.shape[1])), 1)[:, :channels]
+    elif waveform.shape[1] > channels:
+        waveform = waveform[:, :channels]
+    return waveform.to(device=like.device, dtype=like.dtype)
+
+
+def vocoder(
+    carrier: dict,
+    modulator: dict,
+    bands: int,
+    low_hz: float,
+    high_hz: float,
+    attack_ms: float,
+    release_ms: float,
+    modulator_gain_db: float,
+    carrier_gain_db: float,
+    mix: float,
+) -> dict:
+    carrier_waveform, sample_rate = audio_waveform(carrier)
+    mod_waveform = _match_modulator(modulator, sample_rate, carrier_waveform.shape[-1], carrier_waveform.shape[1], carrier_waveform)
+    bands = max(4, min(int(bands), 32))
+    low = max(20.0, float(low_hz))
+    high = max(low + 20.0, min(float(high_hz), sample_rate * 0.45))
+    edges = np.geomspace(low, high, bands + 1)
+    wet = torch.zeros_like(carrier_waveform)
+    for index in range(bands):
+        band_low = float(edges[index])
+        band_high = float(edges[index + 1])
+        carrier_band = sos_filter_waveform(carrier_waveform, butter_sos(sample_rate, "bandpass", (band_low, band_high), order=2), zero_phase=False)
+        mod_band = sos_filter_waveform(mod_waveform, butter_sos(sample_rate, "bandpass", (band_low, band_high), order=2), zero_phase=False)
+        env = meter_envelope(mod_band.reshape(-1, mod_band.shape[-1]), sample_rate, attack_ms, release_ms, mode="rms", frame_ms=2.0).reshape(mod_band.shape)
+        band_gain = env * float(db_to_amp(modulator_gain_db))
+        wet = wet + carrier_band * band_gain
+    peak = wet.abs().amax(dim=(1, 2), keepdim=True)
+    wet = wet / torch.clamp(peak, min=1.0)
+    wet = wet * float(db_to_amp(carrier_gain_db))
+    return copy_audio(carrier, mix_audio(carrier_waveform, wet, mix))

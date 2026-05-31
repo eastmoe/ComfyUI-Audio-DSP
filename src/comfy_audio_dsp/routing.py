@@ -141,3 +141,22 @@ def send_return_loop(audio: dict, return_audio: dict, send_level_db: float, retu
     returned = _match_audio(return_audio, sample_rate, waveform.shape[-1], waveform.shape[1], waveform)
     out = waveform * float(db_to_amp(dry_level_db)) + returned * float(db_to_amp(send_level_db)) * float(db_to_amp(return_level_db))
     return copy_audio(audio, out)
+
+
+def multiband_crossover(audio: dict, bands: str, crossover_low_hz: float, crossover_mid_hz: float, crossover_high_hz: float) -> tuple[dict, dict, dict, dict]:
+    waveform, sample_rate = audio_waveform(audio)
+    nyquist = sample_rate * 0.5
+    c1 = max(20.0, min(float(crossover_low_hz), nyquist - 100.0))
+    c2 = max(c1 + 20.0, min(float(crossover_mid_hz), nyquist - 50.0))
+    c3 = max(c2 + 20.0, min(float(crossover_high_hz), nyquist - 20.0))
+    spectrum = torch.fft.rfft(waveform, dim=-1)
+    freqs = torch.fft.rfftfreq(waveform.shape[-1], d=1.0 / sample_rate).to(device=waveform.device)
+    if str(bands) == "3":
+        masks = [freqs <= c1, (freqs > c1) & (freqs <= c2), freqs > c2, torch.zeros_like(freqs, dtype=torch.bool)]
+    else:
+        masks = [freqs <= c1, (freqs > c1) & (freqs <= c2), (freqs > c2) & (freqs <= c3), freqs > c3]
+    outputs = []
+    for mask in masks:
+        band = torch.fft.irfft(spectrum * mask.view(1, 1, -1), n=waveform.shape[-1], dim=-1)
+        outputs.append(copy_audio(audio, band))
+    return tuple(outputs)

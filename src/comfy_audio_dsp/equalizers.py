@@ -7,12 +7,15 @@ import torch
 from scipy import signal
 
 from .common import (
+    AUDIO_EPS,
+    amp_to_db,
     audio_waveform,
     ba_filter_waveform,
     butter_sos,
     copy_audio,
     db_to_amp,
     flatten_channels,
+    meter_envelope,
     mix_audio,
     normalize_frequency,
     restore_channels,
@@ -20,6 +23,8 @@ from .common import (
 )
 
 FILTER_TYPES = ["low_shelf", "high_shelf", "peak", "low_pass", "high_pass", "band_pass", "band_stop", "notch"]
+SPECTRAL_SHAPER_MODES = ["smooth", "enhance"]
+HUM_BASE_MODES = ["auto", "50", "60"]
 GRAPHIC_EQ_BANDS = {
     "10": [31.5, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0],
     "15": [25.0, 40.0, 63.0, 100.0, 160.0, 250.0, 400.0, 630.0, 1000.0, 1600.0, 2500.0, 4000.0, 6300.0, 10000.0, 16000.0],
@@ -261,4 +266,104 @@ def resonant_pass_filter(audio: dict, mode: str, cutoff_hz: float, resonance_q: 
     wet = _apply_biquad(waveform, sample_rate, "low_pass" if mode == "low_pass" else "high_pass", cutoff_hz, q=resonance_q)
     if abs(float(drive_db)) > 0.001:
         wet = torch.tanh(wet * float(db_to_amp(drive_db))) / max(float(db_to_amp(drive_db)), 1.0)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def dynamic_eq(
+    audio: dict,
+    frequency_hz: float,
+    q: float,
+    threshold_db: float,
+    ratio: float,
+    attack_ms: float,
+    release_ms: float,
+    range_db: float,
+    mode: str,
+    mix: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    bandwidth = max(20.0, float(frequency_hz) / max(float(q), 0.1))
+    nyquist = sample_rate * 0.5
+    low = max(20.0, min(float(frequency_hz) - bandwidth * 0.5, nyquist - 100.0))
+    high = max(low + 20.0, min(float(frequency_hz) + bandwidth * 0.5, nyquist - 20.0))
+    band = sos_filter_waveform(waveform, butter_sos(sample_rate, "bandpass", (low, high), order=2), zero_phase=False)
+    flat, shape = flatten_channels(band)
+    env = meter_envelope(flat, sample_rate, attack_ms, release_ms, mode="rms")
+    level_db = amp_to_db(env)
+    ratio = max(float(ratio), 1.0)
+    over = torch.clamp(level_db - float(threshold_db), min=0.0)
+    below = torch.clamp(float(threshold_db) - level_db, min=0.0)
+    amount_over = torch.clamp(over * (1.0 - 1.0 / ratio), max=abs(float(range_db)))
+    amount_below = torch.clamp(below * (1.0 - 1.0 / ratio), max=abs(float(range_db)))
+    if mode == "boost_above":
+        gain_db = amount_over
+    elif mode == "cut_below":
+        gain_db = -amount_below
+    elif mode == "boost_below":
+        gain_db = amount_below
+    else:
+        gain_db = -amount_over
+    delta = restore_channels(flat * (db_to_amp(gain_db) - 1.0), shape)
+    wet = waveform + delta
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def spectral_smoothing_contrast(audio: dict, mode: str, amount: float, frequency_smoothing_bins: int, fft_size: int, hop_size: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    data = flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    fft_size = max(64, int(fft_size))
+    hop_size = max(1, int(hop_size))
+    smoothing = max(1, int(frequency_smoothing_bins))
+    out = np.zeros_like(data, dtype=np.float32)
+    kernel = np.ones(smoothing, dtype=np.float32) / smoothing
+    amount = max(0.0, float(amount))
+    for row in range(data.shape[0]):
+        _, _, stft = signal.stft(data[row], fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), boundary="zeros", padded=True)
+        mag = np.abs(stft)
+        phase = np.exp(1j * np.angle(stft))
+        log_mag = np.log(np.maximum(mag, 1.0e-8))
+        smooth = signal.convolve2d(log_mag, kernel[:, None], mode="same", boundary="symm")
+        if mode == "enhance":
+            shaped = smooth + (log_mag - smooth) * (1.0 + amount)
+        else:
+            shaped = log_mag * (1.0 - min(amount, 1.0)) + smooth * min(amount, 1.0)
+        _, y = signal.istft(np.exp(shaped) * phase, fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), input_onesided=True)
+        if y.shape[-1] < data.shape[-1]:
+            y = np.pad(y, (0, data.shape[-1] - y.shape[-1]))
+        out[row] = y[: data.shape[-1]].astype(np.float32)
+    wet = restore_channels(torch.from_numpy(out).to(device=waveform.device, dtype=waveform.dtype), shape)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def _detect_hum_base(data: np.ndarray, sample_rate: int) -> float:
+    length = data.shape[-1]
+    if length < 8:
+        return 50.0
+    mono = data.mean(axis=0)
+    spectrum = np.abs(np.fft.rfft(mono * np.hanning(length)))
+    freqs = np.fft.rfftfreq(length, d=1.0 / sample_rate)
+    def score(base: float) -> float:
+        total = 0.0
+        for harmonic in range(1, 7):
+            target = base * harmonic
+            idx = int(np.argmin(np.abs(freqs - target)))
+            total += float(spectrum[idx]) / harmonic
+        return total
+    return 50.0 if score(50.0) >= score(60.0) else 60.0
+
+
+def hum_remover(audio: dict, base_mode: str, max_harmonics: int, q: float, reduction_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    base = _detect_hum_base(waveform.detach().cpu().numpy().reshape(-1, waveform.shape[-1]), sample_rate) if base_mode == "auto" else float(base_mode)
+    wet = waveform
+    depth = max(0.0, min(abs(float(reduction_db)) / 60.0, 1.0))
+    max_harmonics = max(1, int(max_harmonics))
+    for harmonic in range(1, max_harmonics + 1):
+        freq = base * harmonic
+        if freq >= sample_rate * 0.48:
+            break
+        b, a = signal.iirnotch(freq, max(1.0, float(q)), fs=sample_rate)
+        notched = ba_filter_waveform(wet, b, a, zero_phase=False)
+        wet = wet.lerp(notched, depth)
     return copy_audio(audio, mix_audio(waveform, wet, mix))

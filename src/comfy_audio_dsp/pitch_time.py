@@ -211,3 +211,60 @@ def pitch_correction(audio: dict, key: str, scale: str, correction_speed: float,
 
 def varispeed_player(audio: dict, speed_ratio: float, output_gain_db: float) -> dict:
     return resampler_classic(audio, speed_ratio, output_gain_db)
+
+
+def granular_processor(
+    audio: dict,
+    grain_ms: float,
+    overlap: float,
+    pitch_semitones: float,
+    position_jitter_ms: float,
+    time_scatter: float,
+    reverse_probability: float,
+    seed: int,
+    mix: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    rng = np.random.default_rng(int(seed))
+    grain = max(8, int(round(float(grain_ms) * sample_rate / 1000.0)))
+    hop = max(1, int(round(grain / max(float(overlap), 1.0))))
+    jitter = max(0, int(round(float(position_jitter_ms) * sample_rate / 1000.0)))
+    pitch_ratio = 2.0 ** (float(pitch_semitones) / 12.0)
+    window = np.hanning(grain).astype(np.float32)
+    wet = np.zeros_like(data, dtype=np.float32)
+    weight = np.zeros_like(data, dtype=np.float32)
+    starts = list(range(0, data.shape[-1], hop))
+    scatter = max(0.0, min(float(time_scatter), 1.0))
+    if scatter > 0.0:
+        shuffled = starts.copy()
+        rng.shuffle(shuffled)
+        starts = [int(round((1.0 - scatter) * a + scatter * b)) for a, b in zip(starts, shuffled, strict=False)]
+    out_positions = range(0, data.shape[-1], hop)
+    for out_start, source_base in zip(out_positions, starts, strict=False):
+        source_start = int(source_base + rng.integers(-jitter, jitter + 1)) if jitter > 0 else int(source_base)
+        source_start = max(0, min(data.shape[-1] - 1, source_start))
+        source_end = min(data.shape[-1], source_start + grain)
+        if source_end <= source_start:
+            continue
+        out_end = min(data.shape[-1], out_start + grain)
+        size = out_end - out_start
+        if size <= 0:
+            continue
+        chunk = data[..., source_start:source_end]
+        if chunk.shape[-1] < grain:
+            chunk = np.pad(chunk, [(0, 0), (0, 0), (0, grain - chunk.shape[-1])])
+        if abs(pitch_ratio - 1.0) > 1.0e-4:
+            shifted = np.empty_like(chunk)
+            for batch in range(chunk.shape[0]):
+                for channel in range(chunk.shape[1]):
+                    shifted[batch, channel] = _fit_length(_classic_resample_row(chunk[batch, channel], pitch_ratio), grain)
+            chunk = shifted
+        if rng.random() < max(0.0, min(float(reverse_probability), 1.0)):
+            chunk = chunk[..., ::-1]
+        env = window[:size]
+        wet[..., out_start:out_end] += chunk[..., :size] * env
+        weight[..., out_start:out_end] += env
+    wet = wet / np.maximum(weight, 1.0e-5)
+    wet_tensor = _from_numpy(wet, waveform)
+    return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))

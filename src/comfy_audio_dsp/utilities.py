@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import ast
 import json
 import math
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy import signal
 
-from .common import AUDIO_EPS, amp_to_db, audio_waveform, butter_sos, copy_audio, db_to_amp, resample_np, sos_filter_waveform
+from .common import AUDIO_EPS, amp_to_db, audio_waveform, butter_sos, copy_audio, db_to_amp, meter_envelope, resample_np, sos_filter_waveform
 from .dynamics import _integrated_lufs, _loudness_weighted
 
 FADE_CURVES = ["linear", "exponential", "s_curve"]
@@ -141,3 +144,120 @@ def loop_duplicator(audio: dict, loops: int, target_duration_s: float) -> dict:
 def reverse_audio(audio: dict) -> dict:
     waveform, _sample_rate = audio_waveform(audio)
     return copy_audio(audio, torch.flip(waveform, dims=(-1,)))
+
+
+def envelope_follower_output(audio: dict, attack_ms: float, release_ms: float, mode: str, normalize: bool, points: int) -> tuple[dict, float, float, str, dict]:
+    waveform, sample_rate = audio_waveform(audio)
+    source = waveform.abs().amax(dim=1, keepdim=True) if mode == "peak" else torch.sqrt(torch.mean(waveform * waveform, dim=1, keepdim=True) + AUDIO_EPS)
+    env = meter_envelope(source.reshape(-1, source.shape[-1]), sample_rate, attack_ms, release_ms, mode="peak").reshape(source.shape)
+    if bool(normalize):
+        env = env / torch.clamp(env.amax(dim=-1, keepdim=True), min=AUDIO_EPS)
+    current = float(env[..., -1].mean().item())
+    average = float(env.mean().item())
+    count = max(2, int(points))
+    idx = torch.linspace(0, env.shape[-1] - 1, min(count, env.shape[-1]), device=env.device).long()
+    values = env[0, 0, idx].detach().cpu().tolist()
+    return copy_audio(audio, waveform), current, average, json.dumps(values, ensure_ascii=False), copy_audio(audio, env.repeat(1, waveform.shape[1], 1))
+
+
+def declick_decrackle(audio: dict, threshold: float, window_samples: int, mix: float) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    data = waveform.detach().cpu().numpy().astype(np.float32, copy=False)
+    window = max(3, int(window_samples) | 1)
+    out = np.empty_like(data, dtype=np.float32)
+    for batch in range(data.shape[0]):
+        for channel in range(data.shape[1]):
+            x = data[batch, channel]
+            median = signal.medfilt(x, kernel_size=window)
+            residual = x - median
+            mad = np.median(np.abs(residual - np.median(residual))) + 1.0e-8
+            mask = np.abs(residual) > max(float(threshold), 1.0) * 1.4826 * mad
+            repaired = x.copy()
+            repaired[mask] = median[mask]
+            out[batch, channel] = repaired
+    wet = torch.from_numpy(out).to(device=waveform.device, dtype=waveform.dtype)
+    return copy_audio(audio, waveform.lerp(wet, max(0.0, min(float(mix), 1.0))))
+
+
+def phase_rotator_allpass(audio: dict, frequency_hz: float, q: float, stages: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    omega = 2.0 * math.pi * max(20.0, min(float(frequency_hz), sample_rate * 0.45)) / sample_rate
+    alpha = math.sin(omega) / (2.0 * max(float(q), 0.05))
+    cos_omega = math.cos(omega)
+    b0 = (1.0 - alpha) / (1.0 + alpha)
+    b1 = -2.0 * cos_omega / (1.0 + alpha)
+    b = np.array([b0, b1, 1.0], dtype=np.float64)
+    a = np.array([1.0, b1, b0], dtype=np.float64)
+    data = waveform.detach().cpu().numpy().astype(np.float32, copy=False)
+    out = data.copy()
+    for _ in range(max(1, int(stages))):
+        for row in range(out.reshape(-1, out.shape[-1]).shape[0]):
+            flat = out.reshape(-1, out.shape[-1])
+            flat[row] = signal.lfilter(b, a, flat[row]).astype(np.float32)
+    wet = torch.from_numpy(out).to(device=waveform.device, dtype=waveform.dtype)
+    return copy_audio(audio, waveform.lerp(wet, max(0.0, min(float(mix), 1.0))))
+
+
+_ALLOWED_AST = (
+    ast.Expression,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Pow,
+    ast.Mod,
+    ast.USub,
+    ast.UAdd,
+    ast.Load,
+    ast.Name,
+    ast.Constant,
+    ast.Call,
+)
+
+
+def _safe_eval_expression(expression: str, names: dict[str, torch.Tensor | float]) -> torch.Tensor:
+    tree = ast.parse(expression, mode="eval")
+    allowed_funcs = {
+        "sin": torch.sin,
+        "cos": torch.cos,
+        "tan": torch.tan,
+        "tanh": torch.tanh,
+        "abs": torch.abs,
+        "sqrt": torch.sqrt,
+        "log": torch.log,
+        "exp": torch.exp,
+        "clamp": torch.clamp,
+        "min": torch.minimum,
+        "max": torch.maximum,
+    }
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_AST):
+            raise ValueError(f"Comfy-Audio-DSP: unsupported expression element {type(node).__name__}.")
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name) or node.func.id not in allowed_funcs:
+                raise ValueError("Comfy-Audio-DSP: formula only allows whitelisted math functions.")
+        if isinstance(node, ast.Name) and node.id not in names and node.id not in allowed_funcs:
+            raise ValueError(f"Comfy-Audio-DSP: unknown formula name {node.id}.")
+    return eval(compile(tree, "<comfy_audio_dsp_formula>", "eval"), {"__builtins__": {}, **allowed_funcs}, names)
+
+
+def math_signal_mixer(audio_a: dict, audio_b: dict | None, audio_c: dict | None, audio_d: dict | None, expression: str, gain_db: float) -> dict:
+    from .routing import _match_audio
+
+    a, sample_rate = audio_waveform(audio_a)
+    length = max([a.shape[-1]] + [audio_waveform(audio)[0].shape[-1] for audio in (audio_b, audio_c, audio_d) if audio is not None])
+    channels = max([a.shape[1]] + [audio_waveform(audio)[0].shape[1] for audio in (audio_b, audio_c, audio_d) if audio is not None])
+    A = _match_audio(audio_a, sample_rate, length, channels, a)
+    zeros = torch.zeros_like(A)
+    B = _match_audio(audio_b, sample_rate, length, channels, A) if audio_b is not None else zeros
+    C = _match_audio(audio_c, sample_rate, length, channels, A) if audio_c is not None else zeros
+    D = _match_audio(audio_d, sample_rate, length, channels, A) if audio_d is not None else zeros
+    t = torch.arange(length, device=A.device, dtype=A.dtype).view(1, 1, -1) / float(sample_rate)
+    names = {"A": A, "B": B, "C": C, "D": D, "t": t, "pi": math.pi}
+    out = _safe_eval_expression(expression or "A", names)
+    if not isinstance(out, torch.Tensor):
+        out = torch.as_tensor(out, device=A.device, dtype=A.dtype) + torch.zeros_like(A)
+    out = out.to(device=A.device, dtype=A.dtype) * float(db_to_amp(gain_db))
+    return copy_audio(audio_a, torch.clamp(out, min=-4.0, max=4.0))

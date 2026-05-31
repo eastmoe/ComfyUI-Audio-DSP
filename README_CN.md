@@ -57,6 +57,9 @@
 | Tilt EQ | 倾斜均衡：以枢轴频率为中心，一端提升另一端降低。 |
 | RIAA EQ | RIAA 唱机均衡：播放去加重或刻片预加重。 |
 | High Pass / Low Pass with Resonance | 带谐振高通/低通：模拟合成器滤波特性，可加驱动。 |
+| Dynamic EQ | 动态 EQ：单频段阈值/比率控制，用于动态削共振或增强基频。 |
+| Spectral Smoothing / Contrast | 频谱抹平/对比增强：平滑或增强频谱包络。 |
+| Hum Remover | 去嗡嗡声：自动或固定 50/60 Hz 及谐波陷波。 |
 
 ## 混响节点
 
@@ -95,6 +98,7 @@
 | Ring Modulator | 环形调制：信号与载波相乘，产生金属质感。 |
 | Auto Panner | 自动声像：LFO 调制左右声像位置。 |
 | Uni-vibe | 复古光耦合移相/合唱风格效果。 |
+| Vocoder | 声码器：用调制信号包络塑形载波滤波器组。 |
 
 ## 失真与染色节点
 
@@ -120,6 +124,7 @@
 | Harmonizer | 和声器：生成最多 4 个固定音程声部。 |
 | Pitch Correction (Auto-Tune style) | 音高修正：将单声部音高拉向指定调性和音阶。 |
 | Varispeed Player | 变速播放：模拟设备变速，音高和时长一起改变。 |
+| Granular Processor | 颗粒处理器：窗口颗粒重放，支持音高、抖动、散布和反转概率。 |
 
 ## 立体声场控制节点
 
@@ -185,6 +190,7 @@
 | Crossfader | 在两路输入间线性或等功率交叉淡化。 |
 | Sidechain Gate / Compressor | 使用外部侧链输入控制门限或压缩。 |
 | Send/Return Loop | 用于效果发送/返回流程的干声与返回信号混合。 |
+| Multiband Crossover | 多频段分频器：拆分为 3 或 4 个频段用于并行处理。 |
 
 ## 实用工具节点
 
@@ -203,6 +209,10 @@
 | Delay Compensation | 手动添加采样点或毫秒延迟。 |
 | Loop / Duplicator | 按次数循环或重复到目标时长。 |
 | Reverse Audio | 反转音频播放方向。 |
+| Envelope Follower Output | 包络跟随器输出：标量、文本点列表和音频速率控制信号。 |
+| Declick / Decrackle | 去咔嗒/去噼啪：基于中值的短脉冲修复。 |
+| Phase Rotator / All-Pass Filter | 相位旋转/全通滤波：改变相位而尽量不改变幅度。 |
+| Math / Signal Mixer | 数学/信号混算：对最多 4 路音频执行安全逐样本公式。 |
 
 ## 目录结构
 
