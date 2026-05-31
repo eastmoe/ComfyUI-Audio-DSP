@@ -66,6 +66,7 @@
 | Dynamic EQ | 动态 EQ：单频段阈值/比率控制，用于动态削共振或增强基频。 |
 | Spectral Smoothing / Contrast | 频谱抹平/对比增强：平滑或增强频谱包络。 |
 | Hum Remover | 去嗡嗡声：自动或固定 50/60 Hz 及谐波陷波。 |
+| Match EQ | 频谱匹配均衡：将当前素材频谱包络匹配到参考音频。 |
 | Linear Phase EQ | 线性相位 EQ：零相位 FFT 幅度塑形。 |
 | Comb Filter | 梳状滤波器：前馈/反馈梳状滤波。 |
 
@@ -123,6 +124,8 @@
 | Vocoder | 声码器：用调制信号包络塑形载波滤波器组。 |
 | Barberpole Flanger | Barberpole 镶边：连续上升或下降的无限镶边错觉。 |
 | Auto-Filter | 自动滤波器：LFO 控制滤波器扫动。 |
+| Auto-Wah / Envelope Filter | Auto-Wah / 包络滤波器：输入包络控制带通中心频率。 |
+| Rhythmic Gate / Stutter Sequencer | 节奏门控 / Stutter 序列器：按节拍图案门控或重复。 |
 
 ## 模块化调制源节点
 
@@ -189,6 +192,8 @@
 | Doppler Effect | 根据距离变化和速度模拟多普勒音高/延迟变化。 |
 | VBAP Panner | VBAP 摆位：按扬声器角度输出多声道摆位。 |
 | Higher-Order Ambisonics Encoder | 高阶 Ambisonics：近似 HOA 多声道编码。 |
+| Higher-Order Ambisonics Decoder | 高阶 Ambisonics 解码：输出立体声或自定义扬声器布局。 |
+| Higher-Order Ambisonics Rotator | 高阶 Ambisonics 旋转：水平旋转 HOA 声场。 |
 
 ## 测量与分析节点
 
@@ -254,6 +259,7 @@
 | Delay Compensation | 手动添加采样点或毫秒延迟。 |
 | Loop / Duplicator | 按次数循环或重复到目标时长。 |
 | Reverse Audio | 反转音频播放方向。 |
+| Dither | 抖动：RPDF、TPDF 或简单噪声整形固定点量化。 |
 | Envelope Follower Output | 包络跟随器输出：标量、文本点列表和音频速率控制信号。 |
 | Declick / Decrackle | 去咔嗒/去噼啪：基于中值的短脉冲修复。 |
 | Phase Rotator / All-Pass Filter | 相位旋转/全通滤波：改变相位而尽量不改变幅度。 |
@@ -266,6 +272,7 @@
 | De-Clip | 削波修复：插值修复短时过载区域。 |
 | De-Reverb | 去混响：用 STFT 尾音抑制减少房间混响。 |
 | Bandwidth Extension | 带宽扩展：合成高频泛音补全带宽。 |
+| Denoiser | 宽带降噪：频谱减法或维纳式连续底噪抑制。 |
 
 ## 工作流集成节点
 

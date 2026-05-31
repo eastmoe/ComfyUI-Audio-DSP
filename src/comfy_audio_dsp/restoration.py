@@ -6,6 +6,8 @@ from scipy import signal
 
 from .common import audio_waveform, butter_sos, clamp01, copy_audio, db_to_amp, flatten_channels, mix_audio, restore_channels, sos_filter_waveform
 
+DENOISER_METHODS = ["wiener", "spectral_subtract"]
+
 
 def _to_numpy(waveform: torch.Tensor) -> np.ndarray:
     return waveform.detach().cpu().numpy().astype(np.float32, copy=False)
@@ -73,4 +75,35 @@ def bandwidth_extension(audio: dict, crossover_hz: float, amount: float, drive_d
     wet = waveform + harmonics * clamp01(amount) + high * (0.25 * clamp01(amount))
     peak = torch.amax(torch.abs(wet), dim=-1, keepdim=True)
     wet = wet / torch.clamp(peak, min=1.0)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def denoiser(audio: dict, method: str, noise_profile_s: float, strength: float, fft_size: int, hop_size: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    data = flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    fft_size = max(128, int(fft_size))
+    hop_size = max(1, int(hop_size))
+    strength = clamp01(strength)
+    profile_frames = max(1, int(round(float(noise_profile_s) * sample_rate / hop_size)))
+    out = np.zeros_like(data, dtype=np.float32)
+    for row in range(data.shape[0]):
+        _, _, stft = signal.stft(data[row], fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), boundary="zeros", padded=True)
+        mag = np.abs(stft)
+        phase = np.exp(1j * np.angle(stft))
+        profile = mag[:, : min(profile_frames, mag.shape[1])]
+        noise = np.maximum(np.median(profile, axis=1, keepdims=True), 1.0e-8)
+        if method == "spectral_subtract":
+            cleaned = np.maximum(mag - noise * (0.5 + strength * 3.0), 0.0)
+            gain = np.maximum(cleaned / np.maximum(mag, 1.0e-8), 1.0 - strength)
+        else:
+            signal_power = np.maximum(mag * mag - noise * noise, 0.0)
+            noise_power = noise * noise * (0.5 + strength * 4.0)
+            gain = signal_power / np.maximum(signal_power + noise_power, 1.0e-8)
+            gain = np.maximum(gain, 1.0 - strength)
+        _, y = signal.istft(mag * gain * phase, fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), input_onesided=True)
+        if y.shape[-1] < data.shape[-1]:
+            y = np.pad(y, (0, data.shape[-1] - y.shape[-1]))
+        out[row] = y[: data.shape[-1]].astype(np.float32)
+    wet = restore_channels(torch.from_numpy(out).to(device=waveform.device, dtype=waveform.dtype), shape)
     return copy_audio(audio, mix_audio(waveform, wet, mix))

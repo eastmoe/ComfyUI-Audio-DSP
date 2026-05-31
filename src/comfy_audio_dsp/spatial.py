@@ -257,3 +257,47 @@ def higher_order_ambisonics_encoder(audio: dict, order: str, azimuth_deg: float,
         for _m in range(max(0, 2 * n - 2)):
             channels.append(torch.zeros_like(mono))
     return copy_audio(audio, torch.cat(channels[: (order_i + 1) ** 2], dim=1))
+
+
+def _pad_hoa(waveform: torch.Tensor, order_i: int) -> torch.Tensor:
+    channels = (order_i + 1) ** 2
+    if waveform.shape[1] < channels:
+        waveform = torch.cat([waveform, torch.zeros(waveform.shape[0], channels - waveform.shape[1], waveform.shape[-1], device=waveform.device, dtype=waveform.dtype)], dim=1)
+    return waveform[:, :channels]
+
+
+def higher_order_ambisonics_decoder(audio: dict, order: str, mode: str, speaker_angles_deg: str, width: float) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    order_i = max(1, min(int(order), 3))
+    hoa = _pad_hoa(waveform, order_i)
+    if mode in {"stereo", "binaural"}:
+        angles = [-30.0, 30.0]
+    else:
+        angles = [float(item.strip()) for item in speaker_angles_deg.replace(";", ",").split(",") if item.strip()] or [-30.0, 30.0]
+    outs = []
+    for angle in angles:
+        value = hoa[:, :1] / math.sqrt(2.0)
+        index = 1
+        az = math.radians(angle)
+        for n in range(1, order_i + 1):
+            value = value + (hoa[:, index : index + 1] * math.cos(n * az) + hoa[:, index + 1 : index + 2] * math.sin(n * az)) * float(width) / n
+            index += 2 * n + 1
+        outs.append(value)
+    return copy_audio(audio, torch.cat(outs, dim=1))
+
+
+def higher_order_ambisonics_rotator(audio: dict, order: str, yaw_deg: float) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    order_i = max(1, min(int(order), 3))
+    hoa = _pad_hoa(waveform, order_i)
+    out = hoa.clone()
+    yaw = math.radians(float(yaw_deg))
+    index = 1
+    for n in range(1, order_i + 1):
+        cos_ch = hoa[:, index : index + 1]
+        sin_ch = hoa[:, index + 1 : index + 2]
+        angle = n * yaw
+        out[:, index : index + 1] = cos_ch * math.cos(angle) - sin_ch * math.sin(angle)
+        out[:, index + 1 : index + 2] = cos_ch * math.sin(angle) + sin_ch * math.cos(angle)
+        index += 2 * n + 1
+    return copy_audio(audio, out)

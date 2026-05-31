@@ -412,3 +412,47 @@ def comb_filter(audio: dict, delay_ms: float, feedback: float, feedforward: floa
                 wet[b, c, n] = data[b, c, n] + feedforward * delayed_x + feedback * lp
     wet_tensor = torch.from_numpy(wet).to(device=waveform.device, dtype=waveform.dtype)
     return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))
+
+
+def _match_reference(reference_audio: dict, sample_rate: int, length: int, channels: int, like: torch.Tensor) -> torch.Tensor:
+    waveform, ref_rate = audio_waveform(reference_audio)
+    if ref_rate != sample_rate:
+        from .common import resample_np
+
+        resampled = resample_np(waveform.detach().cpu().numpy().astype(np.float32, copy=False), ref_rate, sample_rate)
+        waveform = torch.from_numpy(resampled).to(device=like.device, dtype=like.dtype)
+    if waveform.shape[-1] < length:
+        waveform = torch.nn.functional.pad(waveform, (0, length - waveform.shape[-1]))
+    else:
+        waveform = waveform[..., :length]
+    if waveform.shape[1] < channels:
+        waveform = waveform.repeat(1, int(math.ceil(channels / waveform.shape[1])), 1)[:, :channels]
+    else:
+        waveform = waveform[:, :channels]
+    return waveform.to(device=like.device, dtype=like.dtype)
+
+
+def match_eq(audio: dict, reference_audio: dict, amount: float, smoothing_bins: int, max_gain_db: float, fft_size: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    reference = _match_reference(reference_audio, sample_rate, waveform.shape[-1], waveform.shape[1], waveform)
+    flat, shape = flatten_channels(waveform)
+    ref_flat, _shape = flatten_channels(reference)
+    length = flat.shape[-1]
+    nfft = max(256, int(fft_size), length)
+    data = flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    ref = ref_flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    source_spec = np.fft.rfft(data, n=nfft, axis=-1)
+    ref_spec = np.fft.rfft(ref, n=nfft, axis=-1)
+    source_env = np.maximum(np.abs(source_spec).mean(axis=0), 1.0e-8)
+    ref_env = np.maximum(np.abs(ref_spec).mean(axis=0), 1.0e-8)
+    smooth = max(1, int(smoothing_bins))
+    if smooth > 1:
+        kernel = np.ones(smooth, dtype=np.float32) / smooth
+        source_env = np.convolve(source_env, kernel, mode="same")
+        ref_env = np.convolve(ref_env, kernel, mode="same")
+    gain_db = 20.0 * np.log10(ref_env / np.maximum(source_env, 1.0e-8))
+    gain_db = np.clip(gain_db, -abs(float(max_gain_db)), abs(float(max_gain_db))) * max(0.0, min(float(amount), 1.0))
+    response = (10.0 ** (gain_db / 20.0)).astype(np.float32)
+    wet = np.fft.irfft(source_spec * response[None, :], n=nfft, axis=-1)[..., :length].astype(np.float32)
+    wet_tensor = restore_channels(torch.from_numpy(wet).to(device=waveform.device, dtype=waveform.dtype), shape)
+    return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))

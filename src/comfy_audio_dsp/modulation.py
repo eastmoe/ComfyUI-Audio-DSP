@@ -10,6 +10,7 @@ from .common import audio_waveform, ba_filter_waveform, butter_sos, clamp01, cop
 WAVEFORMS = ["sine", "triangle", "square"]
 MOD_SOURCE_WAVEFORMS = ["sine", "triangle", "square", "saw", "random"]
 AUTO_FILTER_TYPES = ["low_pass", "high_pass", "band_pass"]
+STUTTER_DIVISIONS = ["1/4", "1/8", "1/16", "1/32"]
 
 
 def _to_numpy(waveform: torch.Tensor) -> np.ndarray:
@@ -345,3 +346,60 @@ def auto_filter(audio: dict, filter_type: str, base_cutoff_hz: float, depth_octa
                     y[n] = z
             wet[b, c] = np.tanh(y) if filter_type == "band_pass" else y
     return copy_audio(audio, mix_audio(waveform, _from_numpy(wet, waveform), mix))
+
+
+def auto_wah(audio: dict, min_frequency_hz: float, max_frequency_hz: float, q: float, attack_ms: float, release_ms: float, drive_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    mono = waveform.mean(dim=1, keepdim=True)
+    env = meter_envelope(mono.abs().reshape(-1, mono.shape[-1]), sample_rate, attack_ms, release_ms, mode="peak").reshape(mono.shape)
+    env = env / torch.clamp(env.amax(dim=-1, keepdim=True), min=1.0e-8)
+    data = _to_numpy(waveform * float(db_to_amp(drive_db)))
+    env_np = env.detach().cpu().numpy().astype(np.float32, copy=False)
+    low = max(20.0, float(min_frequency_hz))
+    high = max(low + 20.0, min(float(max_frequency_hz), sample_rate * 0.45))
+    q = max(0.1, min(float(q), 30.0))
+    wet = np.zeros_like(data, dtype=np.float32)
+    for b in range(data.shape[0]):
+        cutoff = low * ((high / low) ** env_np[b, 0])
+        for c in range(data.shape[1]):
+            low_state = 0.0
+            band_state = 0.0
+            for n in range(data.shape[-1]):
+                f = 2.0 * math.sin(math.pi * min(float(cutoff[n]), sample_rate * 0.45) / sample_rate)
+                high_state = float(data[b, c, n]) - low_state - band_state / q
+                band_state += f * high_state
+                low_state += f * band_state
+                wet[b, c, n] = band_state
+    wet = np.tanh(wet).astype(np.float32)
+    return copy_audio(audio, mix_audio(waveform, _from_numpy(wet, waveform), mix))
+
+
+def rhythmic_gate_stutter(audio: dict, bpm: float, division: str, pattern: str, depth: float, smoothing_ms: float, mode: str, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    bits = [1.0 if item.strip().lower() not in {"0", "-", "off", "false"} else 0.0 for item in str(pattern).replace(";", ",").split(",") if item.strip()]
+    if not bits:
+        bits = [1.0, 0.0, 1.0, 0.0]
+    beats = {"1/4": 1.0, "1/8": 0.5, "1/16": 0.25, "1/32": 0.125}.get(division, 0.25)
+    step_samples = max(1, int(round(60.0 / max(float(bpm), 1.0) * beats * sample_rate)))
+    steps = int(math.ceil(waveform.shape[-1] / step_samples)) + 1
+    gate = np.repeat(np.resize(np.asarray(bits, dtype=np.float32), steps), step_samples)[: waveform.shape[-1]]
+    if smoothing_ms > 0.0:
+        size = max(1, int(round(float(smoothing_ms) * sample_rate / 1000.0)))
+        kernel = np.hanning(size * 2 + 1).astype(np.float32)
+        kernel /= max(float(np.sum(kernel)), 1.0e-8)
+        gate = np.convolve(gate, kernel, mode="same").astype(np.float32)
+    depth = max(0.0, min(float(depth), 1.0))
+    wet = waveform * torch.from_numpy(1.0 - depth * (1.0 - gate)).to(device=waveform.device, dtype=waveform.dtype).view(1, 1, -1)
+    if mode == "stutter" and step_samples > 1:
+        wet = wet.clone()
+        sub = max(1, step_samples // 4)
+        for step in range(steps):
+            if bits[step % len(bits)] > 0.0:
+                continue
+            start = step * step_samples
+            end = min(waveform.shape[-1], start + step_samples)
+            if start >= end:
+                continue
+            grain = waveform[..., start : min(end, start + sub)]
+            wet[..., start:end] = grain.repeat(1, 1, int(math.ceil((end - start) / max(grain.shape[-1], 1))))[..., : end - start] * (1.0 - depth)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))

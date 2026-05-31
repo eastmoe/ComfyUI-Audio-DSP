@@ -66,6 +66,7 @@ Right-click menu:
 | Dynamic EQ | Single-band threshold/ratio-controlled EQ for dynamic resonance cuts or boosts. |
 | Spectral Smoothing / Contrast | STFT spectral envelope smoothing or contrast enhancement. |
 | Hum Remover | Auto or fixed 50/60 Hz hum removal with harmonic notch filters. |
+| Match EQ | Matches the source spectral envelope toward a reference audio signal. |
 | Linear Phase EQ | Zero-phase FFT EQ for linear-phase-style magnitude shaping. |
 | Comb Filter | Feedforward/feedback comb filtering. |
 
@@ -123,6 +124,8 @@ Right-click menu:
 | Vocoder | Filter-bank vocoder using a modulator envelope to shape a carrier. |
 | Barberpole Flanger | Continuously rising or falling flanger illusion. |
 | Auto-Filter | LFO-controlled filter sweep. |
+| Auto-Wah / Envelope Filter | Envelope-controlled resonant band-pass wah filter. |
+| Rhythmic Gate / Stutter Sequencer | Beat-synced gate or stutter pattern effect. |
 
 ## Modulation Sources Nodes
 
@@ -189,6 +192,8 @@ Right-click menu:
 | Doppler Effect | Doppler pitch and delay from changing distance and velocity. |
 | VBAP Panner | Multi-speaker panning from speaker angles. |
 | Higher-Order Ambisonics Encoder | Approximate HOA channel encoder. |
+| Higher-Order Ambisonics Decoder | Approximate HOA decode to stereo or speaker layouts. |
+| Higher-Order Ambisonics Rotator | Yaw rotation for approximate HOA channels. |
 
 ## Metering & Analysis Nodes
 
@@ -254,6 +259,7 @@ Right-click menu:
 | Delay Compensation | Adds manual sample/ms delay. |
 | Loop / Duplicator | Repeats by loop count or target duration. |
 | Reverse Audio | Reverses playback direction. |
+| Dither | RPDF, TPDF, or simple noise-shaped dither for fixed-point export. |
 | Envelope Follower Output | Attack/release envelope as scalar, text points, and audio-rate control signal. |
 | Declick / Decrackle | Median-based repair for short impulse clicks and crackle. |
 | Phase Rotator / All-Pass Filter | Adjustable all-pass phase rotation without intentional magnitude change. |
@@ -266,6 +272,7 @@ Right-click menu:
 | De-Clip | Interpolates short clipped regions. |
 | De-Reverb | STFT tail suppression for reducing room reverb. |
 | Bandwidth Extension | Synthesizes high-frequency harmonics above a crossover. |
+| Denoiser | Broadband background-noise reduction with spectral subtraction or Wiener-style gain. |
 
 ## Workflow Integration Nodes
 

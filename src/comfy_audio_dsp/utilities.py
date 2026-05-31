@@ -15,6 +15,7 @@ from .dynamics import _integrated_lufs, _loudness_weighted
 FADE_CURVES = ["linear", "exponential", "s_curve"]
 NORMALIZE_MODES = ["peak", "rms", "lufs"]
 FORMAT_MODES = ["mono_mix", "mono_left", "mono_right", "stereo_duplicate"]
+DITHER_TYPES = ["none", "rpdf", "tpdf", "noise_shaped"]
 
 
 def gain_trim(audio: dict, gain_db: float) -> dict:
@@ -144,6 +145,30 @@ def loop_duplicator(audio: dict, loops: int, target_duration_s: float) -> dict:
 def reverse_audio(audio: dict) -> dict:
     waveform, _sample_rate = audio_waveform(audio)
     return copy_audio(audio, torch.flip(waveform, dims=(-1,)))
+
+
+def dither(audio: dict, bit_depth: int, dither_type: str, noise_shape: float, seed: int) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    bits = max(8, min(int(bit_depth), 32))
+    levels = float(2 ** (bits - 1) - 1)
+    rng = torch.Generator(device=waveform.device)
+    rng.manual_seed(int(seed))
+    lsb = 1.0 / levels
+    if dither_type == "rpdf":
+        noise = (torch.rand(waveform.shape, generator=rng, device=waveform.device, dtype=waveform.dtype) - 0.5) * lsb
+    elif dither_type in {"tpdf", "noise_shaped"}:
+        a = torch.rand(waveform.shape, generator=rng, device=waveform.device, dtype=waveform.dtype)
+        b = torch.rand(waveform.shape, generator=rng, device=waveform.device, dtype=waveform.dtype)
+        noise = (a - b) * lsb
+    else:
+        noise = torch.zeros_like(waveform)
+    if dither_type == "noise_shaped" and noise.shape[-1] > 1:
+        shaped = noise.clone()
+        strength = max(0.0, min(float(noise_shape), 0.95))
+        shaped[..., 1:] = noise[..., 1:] - strength * noise[..., :-1]
+        noise = shaped
+    quantized = torch.round(torch.clamp(waveform + noise, -1.0, 1.0) * levels) / levels
+    return copy_audio(audio, quantized)
 
 
 def envelope_follower_output(audio: dict, attack_ms: float, release_ms: float, mode: str, normalize: bool, points: int) -> tuple[dict, float, float, str, dict]:
