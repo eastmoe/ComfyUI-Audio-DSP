@@ -38,11 +38,13 @@
 | --- | --- |
 | Compressor | 压缩器：阈值、比率、启动、释放、膝宽、增益补偿、检测方式、干湿混合。 |
 | Limiter | 砖墙限制器：阈值、释放时间、前瞻，防止削波。 |
+| M/S Compressor | M/S 压缩器：分别压缩 Mid 与 Side。 |
 | Noise Gate | 噪声门：阈值、启动、保持、释放、衰减范围。 |
 | Expander | 向下扩展器：降低低电平信号。 |
 | Transient Shaper | 瞬态塑形器：独立控制 Attack 和 Sustain 的增益。 |
 | De-Esser | 嘶声消除器：指定频段压缩，常用于 4-10 kHz。 |
 | Multi-band Compressor | 多段压缩：支持 3 或 4 段，各段有独立阈值、比率和补偿增益。 |
+| Multi-band Limiter | 多段限制器：分频后逐段限制并安全求和。 |
 | Auto Gain / Leveler | 自动增益：按 RMS 或峰值匹配目标电平。 |
 | Loudness Normalizer (LUFS) | 响度标准化：支持整体、短时、瞬时 LUFS 归一化。 |
 | Upward Compressor | 向上压缩器：提升低于阈值的低电平内容。 |
@@ -85,6 +87,7 @@
 | 节点 | 功能 |
 | --- | --- |
 | Convolution Reverb | 卷积混响：加载 WAV 脉冲响应，调节干声/湿声。 |
+| IR Manager | IR 管理器：加载、裁剪、反转、标准化 IR WAV。 |
 | Schroeder Reverb | Schroeder 算法混响：预延迟、衰减时间、扩散度、高低切。 |
 | Freeverb / Moorer Reverb | 反馈延迟网络风格混响：房间尺寸、阻尼、立体声宽度、早期反射。 |
 | Spring Reverb Sim | 弹簧混响模拟：串联全通滤波器和延迟网络。 |
@@ -92,6 +95,7 @@
 | Gated Reverb | 门控混响：非线性尾音截断，80 年代风格。 |
 | Reverse Reverb | 反向混响：反转音频、施加混响、再反转，制造膨胀效果。 |
 | Shimmer Reverb | Shimmer 混响：混响尾音中加入八度移调成分。 |
+| FDN Reverb | FDN 反馈延迟网络混响：扩散、阻尼和调制。 |
 
 ## 延迟与回声节点
 
@@ -107,6 +111,7 @@
 | Reverse Delay | 反向延迟：倒放式延迟重复。 |
 | Granular Delay | 粒子延迟：将延迟湿声拆成颗粒。 |
 | Slap Echo | Slap Echo：常用 slapback 回声预设。 |
+| Echoplex Tape Echo | Echoplex 磁带回声：饱和、老化、哇音和反馈。 |
 
 ## 调制效果节点
 
@@ -151,6 +156,7 @@
 | Exciter / Enhancer | 激励器：生成高频谐波增加亮度。 |
 | Fold & Clip | 折叠/削波混合：波折叠与削波混合失真。 |
 | Amp Simulator | 音箱模拟器：简单放大器和箱体滤波模拟。 |
+| Crossover Distortion | 交越失真：模拟功放死区非线性。 |
 
 ## 音调与时间变换节点
 
@@ -165,6 +171,7 @@
 | Granular Processor | 颗粒处理器：窗口颗粒重放，支持音高、抖动、散布和反转概率。 |
 | Formant Shifter | 共振峰移位器：移动频谱包络。 |
 | Polyphonic Pitch Correction | 多声部音高校正：频谱音级约束。 |
+| PSOLA Pitch Shifter | PSOLA 变调器：时间域单声部变调选项。 |
 
 ## 立体声场控制节点
 
@@ -194,6 +201,8 @@
 | Higher-Order Ambisonics Encoder | 高阶 Ambisonics：近似 HOA 多声道编码。 |
 | Higher-Order Ambisonics Decoder | 高阶 Ambisonics 解码：输出立体声或自定义扬声器布局。 |
 | Higher-Order Ambisonics Rotator | 高阶 Ambisonics 旋转：水平旋转 HOA 声场。 |
+| 6DOF Renderer | 6DOF 渲染器：声源/听者位置和朝向双耳渲染。 |
+| BRIR Convolution | BRIR 卷积：加载立体声 BRIR WAV 做双耳房间渲染。 |
 
 ## 测量与分析节点
 
@@ -240,6 +249,8 @@
 | Crossfader | 在两路输入间线性或等功率交叉淡化。 |
 | Sidechain Gate / Compressor | 使用外部侧链输入控制门限或压缩。 |
 | Send/Return Loop | 用于效果发送/返回流程的干声与返回信号混合。 |
+| Parallel Processing Router | 并联处理路由器：拆分干声与发送路径。 |
+| Parallel Return Mixer | 并联返回混合器：回收并联处理返回。 |
 | Multiband Crossover | 多频段分频器：拆分为 3 或 4 个频段用于并行处理。 |
 
 ## 实用工具节点

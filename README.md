@@ -38,11 +38,13 @@ Right-click menu:
 | --- | --- |
 | Compressor | Threshold, ratio, attack, release, knee, makeup gain, detector, mix. |
 | Limiter | Brickwall-style limiter with threshold, release, and lookahead. |
+| M/S Compressor | Independent Mid and Side compression for stereo mastering. |
 | Noise Gate | Threshold, attack, hold, release, and attenuation range. |
 | Expander | Downward expander for reducing low-level signal. |
 | Transient Shaper | Independent attack and sustain gain controls. |
 | De-Esser | Band-limited compressor for reducing sibilance, typically 4-10 kHz. |
 | Multi-band Compressor | 3 or 4 bands with per-band threshold, ratio, and makeup gain. |
+| Multi-band Limiter | Splits into bands, limits each band, and sums safely. |
 | Auto Gain / Leveler | RMS or peak target level matching with smoothed gain. |
 | Loudness Normalizer (LUFS) | Integrated, short-term, or momentary LUFS normalization. |
 | Upward Compressor | Raises low-level material below a threshold. |
@@ -85,6 +87,7 @@ Right-click menu:
 | Node | Summary |
 | --- | --- |
 | Convolution Reverb | WAV impulse-response convolution with dry/wet controls. |
+| IR Manager | Loads, trims, reverses, normalizes, and reports IR WAV files. |
 | Schroeder Reverb | Classic comb/all-pass algorithm with pre-delay, decay, diffusion, and tone filters. |
 | Freeverb / Moorer Reverb | Feedback delay network style reverb with damping, stereo width, and early reflections. |
 | Spring Reverb Sim | All-pass and delay-network spring reverb approximation. |
@@ -92,6 +95,7 @@ Right-click menu:
 | Gated Reverb | Nonlinear gated tail cutoff for 1980s-style ambience. |
 | Reverse Reverb | Reverse audio, apply reverb, then reverse back for swelling effects. |
 | Shimmer Reverb | Reverb with octave-shifted shimmer in the tail. |
+| FDN Reverb | Feedback delay network reverb with diffusion, damping, and modulation. |
 
 ## Delay & Echo Nodes
 
@@ -107,6 +111,7 @@ Right-click menu:
 | Reverse Delay | Reverse-style delayed repeats. |
 | Granular Delay | Delayed wet path broken into grains. |
 | Slap Echo | Slapback echo presets. |
+| Echoplex Tape Echo | Tape echo with saturation, age tone, wow, and feedback. |
 
 ## Modulation Nodes
 
@@ -151,6 +156,7 @@ Right-click menu:
 | Exciter / Enhancer | Generates high-frequency harmonics for brightness. |
 | Fold & Clip | Hybrid wavefolding and clipping distortion. |
 | Amp Simulator | Simple amp and cabinet simulator. |
+| Crossover Distortion | Power-amp style crossover dead-zone distortion. |
 
 ## Pitch & Time Nodes
 
@@ -165,6 +171,7 @@ Right-click menu:
 | Granular Processor | Windowed grains with pitch, jitter, scatter, and reverse probability. |
 | Formant Shifter | Spectral-envelope/formant shifting. |
 | Polyphonic Pitch Correction | Spectral pitch-class correction for chords and mixes. |
+| PSOLA Pitch Shifter | Time-domain PSOLA-style pitch shifting option. |
 
 ## Stereo Imaging Nodes
 
@@ -194,6 +201,8 @@ Right-click menu:
 | Higher-Order Ambisonics Encoder | Approximate HOA channel encoder. |
 | Higher-Order Ambisonics Decoder | Approximate HOA decode to stereo or speaker layouts. |
 | Higher-Order Ambisonics Rotator | Yaw rotation for approximate HOA channels. |
+| 6DOF Renderer | Source/listener position and listener orientation binaural renderer. |
+| BRIR Convolution | Stereo BRIR WAV convolution for binaural room rendering. |
 
 ## Metering & Analysis Nodes
 
@@ -240,6 +249,8 @@ Right-click menu:
 | Crossfader | Equal-power or linear crossfade between two inputs. |
 | Sidechain Gate / Compressor | Uses external sidechain key input. |
 | Send/Return Loop | Dry/return blend for effect-send workflows. |
+| Parallel Processing Router | Splits dry and send paths for parallel chains. |
+| Parallel Return Mixer | Recombines dry and processed parallel returns. |
 | Multiband Crossover | Splits audio into 3 or 4 frequency bands for parallel processing. |
 
 ## Utilities Nodes

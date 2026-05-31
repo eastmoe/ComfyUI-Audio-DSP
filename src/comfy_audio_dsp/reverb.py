@@ -224,3 +224,49 @@ def shimmer_reverb(audio: dict, reverb_time_s: float, diffusion: float, shimmer_
     wet = base + shifted * max(0.0, min(float(shimmer_amount), 2.0))
     wet = sos_filter_waveform(wet, butter_sos(sample_rate, "lowpass", high_cut_hz, order=2), zero_phase=False)
     return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def fdn_reverb(audio: dict, decay_time_s: float, diffusion: float, damping: float, modulation: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    delays_ms = [29.7, 37.1, 41.1, 43.7, 53.3, 61.7, 71.9, 79.3]
+    delays = [max(1, int(round(ms * sample_rate / 1000.0))) for ms in delays_ms]
+    max_delay = max(delays) + 2
+    feedback = 10.0 ** (-3.0 * max(delays) / max(float(decay_time_s) * sample_rate, 1.0))
+    feedback *= 0.65 + 0.3 * clamp01(diffusion)
+    wet = np.zeros_like(data, dtype=np.float32)
+    for b in range(data.shape[0]):
+        states = np.zeros((len(delays), max_delay), dtype=np.float32)
+        indices = np.zeros(len(delays), dtype=np.int64)
+        lp = np.zeros((data.shape[1], len(delays)), dtype=np.float32)
+        for n in range(data.shape[-1]):
+            read = np.asarray([states[i, (indices[i] - delays[i]) % max_delay] for i in range(len(delays))], dtype=np.float32)
+            mixed = read - 2.0 * np.mean(read)
+            for c in range(data.shape[1]):
+                lp[c] = (1.0 - clamp01(damping)) * mixed + clamp01(damping) * lp[c]
+                wet[b, c, n] = np.mean(read)
+                wobble = 1.0 + 0.02 * clamp01(modulation) * np.sin(2.0 * np.pi * (0.17 + 0.03 * c) * n / sample_rate)
+                write = data[b, c, n] * (0.25 + 0.05 * c) + lp[c] * feedback * wobble
+                for i in range(len(delays)):
+                    states[i, indices[i]] += write[i] / max(1, data.shape[1])
+            indices = (indices + 1) % max_delay
+    wet_tensor = _tone_filter(_from_numpy(wet, waveform), sample_rate, 60.0, sample_rate * 0.45)
+    return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))
+
+
+def ir_manager(path: str, target_sample_rate: int, start_ms: float, max_duration_s: float, normalize_ir: bool, reverse: bool) -> tuple[dict, str]:
+    target = max(1000, int(target_sample_rate))
+    ir = _read_wav(path, target)
+    start = max(0, int(round(float(start_ms) * target / 1000.0)))
+    end = ir.shape[-1] if max_duration_s <= 0.0 else min(ir.shape[-1], start + max(1, int(round(float(max_duration_s) * target))))
+    ir = ir[:, start:end]
+    if bool(reverse):
+        ir = ir[:, ::-1].copy()
+    if bool(normalize_ir):
+        peak = np.max(np.abs(ir), axis=1, keepdims=True)
+        ir = ir / np.maximum(peak, 1.0e-6)
+    audio = {"waveform": torch.from_numpy(ir[None, :, :].astype(np.float32)), "sample_rate": target}
+    info = {"sample_rate": target, "channels": int(ir.shape[0]), "samples": int(ir.shape[-1]), "duration_s": float(ir.shape[-1] / target)}
+    import json
+
+    return audio, json.dumps(info, ensure_ascii=False)

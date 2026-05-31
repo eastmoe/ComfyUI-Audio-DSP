@@ -301,3 +301,51 @@ def higher_order_ambisonics_rotator(audio: dict, order: str, yaw_deg: float) -> 
         out[:, index + 1 : index + 2] = cos_ch * math.sin(angle) + sin_ch * math.cos(angle)
         index += 2 * n + 1
     return copy_audio(audio, out)
+
+
+def six_dof_renderer(
+    audio: dict,
+    source_x: float,
+    source_y: float,
+    source_z: float,
+    listener_x: float,
+    listener_y: float,
+    listener_z: float,
+    yaw_deg: float,
+    pitch_deg: float,
+    roll_deg: float,
+    room_mix: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    dx = float(source_x) - float(listener_x)
+    dy = float(source_y) - float(listener_y)
+    dz = float(source_z) - float(listener_z)
+    yaw = math.radians(float(yaw_deg))
+    cos_y, sin_y = math.cos(-yaw), math.sin(-yaw)
+    rx = dx * cos_y - dy * sin_y
+    ry = dx * sin_y + dy * cos_y
+    rz = dz
+    distance = max(0.1, math.sqrt(rx * rx + ry * ry + rz * rz))
+    azimuth = math.degrees(math.atan2(ry, rx))
+    elevation = math.degrees(math.atan2(rz, max(math.sqrt(rx * rx + ry * ry), 1.0e-6))) - float(pitch_deg) * 0.25 - float(roll_deg) * 0.1
+    panned = binaural_panner({"waveform": waveform, "sample_rate": sample_rate}, azimuth, elevation, distance, 1.0)
+    return distance_simulator(panned, distance, 0.45, room_mix, 0.0, 1.2)
+
+
+def brir_convolution(audio: dict, brir_wav: str, normalize_ir: bool, mix: float) -> dict:
+    from .reverb import _read_wav
+
+    waveform, sample_rate = audio_waveform(audio)
+    mono = _mono(waveform)
+    ir = _read_wav(brir_wav, sample_rate)
+    if ir.shape[0] < 2:
+        ir = np.repeat(ir[:1], 2, axis=0)
+    if bool(normalize_ir):
+        ir = ir / np.maximum(np.max(np.abs(ir), axis=1, keepdims=True), 1.0e-6)
+    source = _to_numpy(mono)
+    wet = np.zeros((source.shape[0], 2, source.shape[-1]), dtype=np.float32)
+    for b in range(source.shape[0]):
+        wet[b, 0] = signal.fftconvolve(source[b, 0], ir[0], mode="full")[: source.shape[-1]].astype(np.float32)
+        wet[b, 1] = signal.fftconvolve(source[b, 0], ir[1], mode="full")[: source.shape[-1]].astype(np.float32)
+    dry = mono.repeat(1, 2, 1)
+    return copy_audio(audio, mix_audio(dry, _from_numpy(wet, waveform), mix))

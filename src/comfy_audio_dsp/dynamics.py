@@ -382,3 +382,52 @@ def parallel_compression_mix(
     dry = flat * float(db_to_amp(dry_gain_db))
     wet = dry.lerp(compressed, max(0.0, min(float(blend), 1.0)))
     return copy_audio(audio, restore_channels(wet, shape))
+
+
+def mid_side_compressor(
+    audio: dict,
+    mid_threshold_db: float,
+    mid_ratio: float,
+    side_threshold_db: float,
+    side_ratio: float,
+    attack_ms: float,
+    release_ms: float,
+    knee_db: float,
+    side_makeup_db: float,
+    mix: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    source = waveform if waveform.shape[1] >= 2 else waveform.repeat(1, 2, 1)
+    left = source[:, :1]
+    right = source[:, 1:2]
+    mid = (left + right) * 0.5
+    side = (left - right) * 0.5
+    mid_env = meter_envelope(mid.reshape(-1, mid.shape[-1]), sample_rate, attack_ms, release_ms, mode="rms").reshape(mid.shape)
+    side_env = meter_envelope(side.reshape(-1, side.shape[-1]), sample_rate, attack_ms, release_ms, mode="rms").reshape(side.shape)
+    mid_wet = mid * db_to_amp(_compressor_gain_db(mid_env, mid_threshold_db, mid_ratio, knee_db))
+    side_wet = side * db_to_amp(_compressor_gain_db(side_env, side_threshold_db, side_ratio, knee_db) + float(side_makeup_db))
+    wet = torch.cat([mid_wet + side_wet, mid_wet - side_wet], dim=1)
+    if waveform.shape[1] > 2:
+        wet = torch.cat([wet, waveform[:, 2:]], dim=1)
+    return copy_audio(audio, mix_audio(waveform if waveform.shape[1] >= 2 else source, wet, mix))
+
+
+def multiband_limiter(
+    audio: dict,
+    bands: int,
+    crossover_low_hz: float,
+    crossover_mid_hz: float,
+    crossover_high_hz: float,
+    threshold_db: float,
+    release_ms: float,
+    lookahead_ms: float,
+    mix: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    band_count = 3 if str(bands) == "3" or bands == 3 else 4
+    split = _split_bands(waveform, sample_rate, band_count, (crossover_low_hz, crossover_mid_hz, crossover_high_hz))
+    processed = [limiter({"waveform": band, "sample_rate": sample_rate}, threshold_db, release_ms, lookahead_ms)["waveform"] for band in split]
+    wet = torch.stack(processed, dim=0).sum(dim=0)
+    peak = torch.amax(torch.abs(wet), dim=(1, 2), keepdim=True)
+    wet = torch.where(peak > 1.0, wet / torch.clamp(peak, min=1.0), wet)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))

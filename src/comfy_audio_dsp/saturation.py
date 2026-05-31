@@ -134,3 +134,14 @@ def amp_simulator(audio: dict, drive_db: float, tone: float, cabinet: str, prese
         wet = wet + high * max(0.0, min(float(presence), 2.0)) * 0.35
     wet = wet * float(db_to_amp(output_gain_db))
     return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def crossover_distortion(audio: dict, threshold: float, slope: float, drive_db: float, output_gain_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    x = waveform * float(db_to_amp(drive_db))
+    threshold = max(0.0, min(float(threshold), 0.5))
+    slope = max(0.0, min(float(slope), 1.0))
+    dead = torch.clamp((torch.abs(x) - threshold) / max(1.0 - threshold, 1.0e-6), min=0.0)
+    wet = torch.sign(x) * (dead * (1.0 - slope) + torch.tanh(dead * 3.0) * slope)
+    wet = _tone_stack(wet, sample_rate, 0.65) * float(db_to_amp(output_gain_db))
+    return copy_audio(audio, mix_audio(waveform, wet, mix))

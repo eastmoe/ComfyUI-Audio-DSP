@@ -87,10 +87,41 @@ def _pitch_shift_row(x: np.ndarray, semitones: float) -> np.ndarray:
     return _fit_length(shifted, x.shape[-1])
 
 
+def _psola_shift_row(x: np.ndarray, sample_rate: int, semitones: float, frame_ms: float) -> np.ndarray:
+    ratio = 2.0 ** (float(semitones) / 12.0)
+    frame = max(64, int(round(float(frame_ms) * sample_rate / 1000.0)))
+    hop_in = max(16, frame // 4)
+    hop_out = max(1, int(round(hop_in / max(ratio, 1.0e-6))))
+    window = np.hanning(frame).astype(np.float32)
+    padded = np.pad(x.astype(np.float32), (frame, frame))
+    out = np.zeros_like(padded, dtype=np.float32)
+    weight = np.zeros_like(padded, dtype=np.float32)
+    out_pos = frame
+    for start in range(frame, len(padded) - frame, hop_in):
+        chunk = padded[start : start + frame] * window
+        end = min(out.shape[-1], out_pos + frame)
+        size = end - out_pos
+        if size <= 0:
+            break
+        out[out_pos:end] += chunk[:size] * window[:size]
+        weight[out_pos:end] += window[:size] * window[:size]
+        out_pos += hop_out
+    out = out / np.maximum(weight, 1.0e-5)
+    return _fit_length(out[frame : frame + x.shape[-1]], x.shape[-1])
+
+
 def pitch_shifter(audio: dict, semitones: float, cents: float, mix: float) -> dict:
     waveform, _sample_rate = audio_waveform(audio)
     total_semitones = float(semitones) + float(cents) / 100.0
     wet_np = _apply_rows(_to_numpy(waveform), lambda row: _pitch_shift_row(row, total_semitones))
+    wet = _from_numpy(wet_np, waveform)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def psola_pitch_shifter(audio: dict, semitones: float, cents: float, frame_ms: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    total = float(semitones) + float(cents) / 100.0
+    wet_np = _apply_rows(_to_numpy(waveform), lambda row: _psola_shift_row(row, sample_rate, total, frame_ms))
     wet = _from_numpy(wet_np, waveform)
     return copy_audio(audio, mix_audio(waveform, wet, mix))
 

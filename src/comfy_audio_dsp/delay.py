@@ -183,3 +183,28 @@ def slap_echo(audio: dict, style: str, mix: float) -> dict:
     if style == "rockabilly":
         return filtered_delay(audio, 115.0, 0.18, 140.0, 5200.0, mix)
     return filtered_delay(audio, 85.0, 0.05, 120.0, 7000.0, mix)
+
+
+def echoplex_tape_echo(audio: dict, delay_ms: float, feedback: float, tape_age: float, wow_depth_ms: float, record_level_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    delay = max(1, int(round(float(delay_ms) * sample_rate / 1000.0)))
+    feedback = max(0.0, min(float(feedback), 0.95))
+    age = clamp01(tape_age)
+    wet = np.zeros_like(data, dtype=np.float32)
+    drive = 10.0 ** (float(record_level_db) / 20.0)
+    for b in range(data.shape[0]):
+        for c in range(data.shape[1]):
+            y = np.zeros(data.shape[-1], dtype=np.float32)
+            lp = 0.0
+            for n in range(data.shape[-1]):
+                wobble = float(wow_depth_ms) * sample_rate / 1000.0 * math.sin(2.0 * math.pi * 0.55 * n / sample_rate + c * math.pi * 0.5)
+                read_index = n - delay - wobble
+                delayed = _fractional_read(y, read_index) if read_index > 1.0 else 0.0
+                lp = (0.08 + age * 0.20) * delayed + (0.92 - age * 0.20) * lp
+                y[n] = math.tanh((data[b, c, n] + lp * feedback) * drive)
+            wet[b, c] = y
+    wet_tensor = _from_numpy(wet, waveform)
+    wet_tensor = sos_filter_waveform(wet_tensor, butter_sos(sample_rate, "highpass", 70.0 + age * 160.0, order=1), zero_phase=False)
+    wet_tensor = sos_filter_waveform(wet_tensor, butter_sos(sample_rate, "lowpass", 8500.0 - age * 4500.0, order=2), zero_phase=False)
+    return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))

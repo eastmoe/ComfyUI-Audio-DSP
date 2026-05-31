@@ -160,3 +160,19 @@ def multiband_crossover(audio: dict, bands: str, crossover_low_hz: float, crosso
         band = torch.fft.irfft(spectrum * mask.view(1, 1, -1), n=waveform.shape[-1], dim=-1)
         outputs.append(copy_audio(audio, band))
     return tuple(outputs)
+
+
+def parallel_processing_router(audio: dict, send_level_db: float, dry_level_db: float) -> tuple[dict, dict]:
+    waveform, _sample_rate = audio_waveform(audio)
+    dry = waveform * float(db_to_amp(dry_level_db))
+    send = waveform * float(db_to_amp(send_level_db))
+    return copy_audio(audio, dry), copy_audio(audio, send)
+
+
+def parallel_return_mixer(dry_audio: dict, processed_audio: dict, processed_level_db: float, dry_level_db: float, mix: float) -> dict:
+    dry, sample_rate = audio_waveform(dry_audio)
+    processed = _match_audio(processed_audio, sample_rate, dry.shape[-1], dry.shape[1], dry)
+    out = dry * float(db_to_amp(dry_level_db)) + processed * float(db_to_amp(processed_level_db)) * max(0.0, min(float(mix), 1.0))
+    peak = torch.amax(torch.abs(out), dim=(1, 2), keepdim=True)
+    out = torch.where(peak > 1.0, out / torch.clamp(peak, min=1.0), out)
+    return copy_audio(dry_audio, out)
