@@ -20,6 +20,9 @@ Right-click menu:
 `eastmoe -> Comfy-Audio-DSP -> Delay & Echo`
 `eastmoe -> Comfy-Audio-DSP -> Modulation`
 `eastmoe -> Comfy-Audio-DSP -> Distortion & Saturation`
+`eastmoe -> Comfy-Audio-DSP -> Pitch & Time`
+`eastmoe -> Comfy-Audio-DSP -> Stereo Imaging`
+`eastmoe -> Comfy-Audio-DSP -> Spatial & 3D`
 
 ## Dynamics Nodes
 
@@ -103,6 +106,42 @@ Right-click menu:
 | Wavefolder | Wavefolding for complex harmonics. |
 | Exciter / Enhancer | Generates high-frequency harmonics for brightness. |
 
+## Pitch & Time Nodes
+
+| Node | Summary |
+| --- | --- |
+| Pitch Shifter | Shifts pitch by semitones and cents while keeping duration. |
+| Time Stretcher | Changes duration from 0.5x to 2x while preserving pitch. |
+| Resampler (Classic) | Tape-style resampling where speed, pitch, and duration change together. |
+| Harmonizer | Generates up to four fixed-interval harmony voices. |
+| Pitch Correction (Auto-Tune style) | Monophonic pitch correction to a selected key and scale. |
+| Varispeed Player | Varispeed playback with linked speed, pitch, and duration. |
+
+## Stereo Imaging Nodes
+
+| Node | Summary |
+| --- | --- |
+| Panner (Balance) | Left/right balance with optional equal-power law. |
+| Stereo Width | Mid/side stereo width expansion or narrowing. |
+| Mid/Side Encoder | Encodes LR stereo to Mid and Side channels. |
+| Mid/Side Decoder | Decodes Mid and Side channels back to LR stereo. |
+| Mid/Side EQ | Independent EQ/filtering for Mid and Side. |
+| Stereo Enhancer / Haas Effect | Short channel delay for Haas stereo widening. |
+| Swap Channels | Swaps left and right channels. |
+| Mono Maker | Makes low frequencies below a cutoff mono. |
+
+## Spatial & 3D Nodes
+
+| Node | Summary |
+| --- | --- |
+| Binaural Panner (HRTF) | Built-in ITD/ILD binaural panner for mono sources. |
+| HRTF Convolution | SOFA HRTF convolution using the nearest measured direction. |
+| Ambisonics Encoder (1st order) | Encodes mono audio to WXYZ first-order Ambisonics. |
+| Ambisonics Decoder (Stereo/Binaural) | Decodes first-order Ambisonics to stereo or simple binaural output. |
+| Ambisonics Rotator | Rotates WXYZ soundfields by yaw, pitch, and roll. |
+| Distance Simulator | Distance gain, air absorption, predelay, and reverb blend. |
+| Doppler Effect | Doppler pitch and delay from changing distance and velocity. |
+
 ## Repository Layout
 
 ```text
@@ -126,5 +165,8 @@ The DSP implementation is split by category:
 - `delay.py`: delay and echo processors.
 - `equalizers.py`: equalizer and filter processors.
 - `modulation.py`: chorus, flanger, phaser, tremolo, vibrato, rotary, ring modulation, panning, and Uni-vibe processors.
+- `pitch_time.py`: pitch shifting, time stretching, harmonizing, correction, classic resampling, and varispeed processors.
 - `reverb.py`: convolution, algorithmic, gated, and reverse reverbs.
 - `saturation.py`: clipping, saturation, fuzz, bit crushing, overdrive, wavefolding, and exciter processors.
+- `stereo.py`: panning, stereo width, Mid/Side tools, Haas widening, channel swap, and mono-maker processors.
+- `spatial.py`: binaural panning, optional SOFA HRTF convolution, first-order Ambisonics, distance, and Doppler processors.

@@ -20,6 +20,9 @@
 `eastmoe -> Comfy-Audio-DSP -> 延迟与回声`
 `eastmoe -> Comfy-Audio-DSP -> 调制效果`
 `eastmoe -> Comfy-Audio-DSP -> 失真与染色`
+`eastmoe -> Comfy-Audio-DSP -> 音调与时间变换`
+`eastmoe -> Comfy-Audio-DSP -> 立体声场控制`
+`eastmoe -> Comfy-Audio-DSP -> 空间音频`
 
 ## 动态处理节点
 
@@ -103,6 +106,42 @@
 | Wavefolder | 波折器：折叠波形产生复杂谐波。 |
 | Exciter / Enhancer | 激励器：生成高频谐波增加亮度。 |
 
+## 音调与时间变换节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Pitch Shifter | 变调器：按半音和音分移动音高，并尽量保持时长。 |
+| Time Stretcher | 时间伸缩：在 0.5x-2x 范围改变时长，并尽量保持音高。 |
+| Resampler (Classic) | 经典重采样：磁带式变速，速度、音高和时长同时变化。 |
+| Harmonizer | 和声器：生成最多 4 个固定音程声部。 |
+| Pitch Correction (Auto-Tune style) | 音高修正：将单声部音高拉向指定调性和音阶。 |
+| Varispeed Player | 变速播放：模拟设备变速，音高和时长一起改变。 |
+
+## 立体声场控制节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Panner (Balance) | 平衡控制：左右声道增益调节，可选等功率法则。 |
+| Stereo Width | 立体声宽度：通过 Mid/Side 处理扩大或缩小声像。 |
+| Mid/Side Encoder | 将 LR 信号编码为 Mid 和 Side。 |
+| Mid/Side Decoder | 将 Mid/Side 信号解码回 LR。 |
+| Mid/Side EQ | 分别对 Mid 与 Side 应用均衡/滤波。 |
+| Stereo Enhancer / Haas Effect | 使用短通道延迟制造 Haas 立体声增强。 |
+| Swap Channels | 交换左右声道。 |
+| Mono Maker | 将指定截止频率以下的低频强制为单声道。 |
+
+## 空间音频节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Binaural Panner (HRTF) | 双耳声像器：使用内置 ITD/ILD 近似线索摆放单声源。 |
+| HRTF Convolution | 加载 SOFA HRTF 并按最近方向进行双耳卷积。 |
+| Ambisonics Encoder (1st order) | 一阶 Ambisonics 编码：单声道输入输出 WXYZ。 |
+| Ambisonics Decoder (Stereo/Binaural) | 将一阶 Ambisonics 解码为立体声或简单双耳输出。 |
+| Ambisonics Rotator | 旋转 WXYZ Ambisonics 声场。 |
+| Distance Simulator | 距离衰减、空气吸收、预延迟和混响比例联动。 |
+| Doppler Effect | 根据距离变化和速度模拟多普勒音高/延迟变化。 |
+
 ## 目录结构
 
 ```text
@@ -125,5 +164,8 @@ DSP 实现已按分类拆分：
 - `delay.py`：延迟与回声处理。
 - `equalizers.py`：均衡与滤波处理。
 - `modulation.py`：合唱、镶边、移相、震音、颤音、旋转扬声器、环形调制、声像和 Uni-vibe。
+- `pitch_time.py`：变调、时间伸缩、和声、音高修正、经典重采样和变速播放。
 - `reverb.py`：卷积混响、算法混响、门控混响和反向混响。
 - `saturation.py`：削波、饱和、法兹、比特粉碎、过载、波折和激励器。
+- `stereo.py`：声像、立体声宽度、Mid/Side、Haas 增强、声道交换和低频单声道化。
+- `spatial.py`：双耳声像、可选 SOFA HRTF、一阶 Ambisonics、距离和多普勒处理。
