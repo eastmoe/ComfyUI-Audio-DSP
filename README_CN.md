@@ -23,6 +23,10 @@
 `eastmoe -> Comfy-Audio-DSP -> 音调与时间变换`
 `eastmoe -> Comfy-Audio-DSP -> 立体声场控制`
 `eastmoe -> Comfy-Audio-DSP -> 空间音频`
+`eastmoe -> Comfy-Audio-DSP -> 测量与分析`
+`eastmoe -> Comfy-Audio-DSP -> 信号发生器`
+`eastmoe -> Comfy-Audio-DSP -> 路由与混音`
+`eastmoe -> Comfy-Audio-DSP -> 实用工具`
 
 ## 动态处理节点
 
@@ -142,6 +146,64 @@
 | Distance Simulator | 距离衰减、空气吸收、预延迟和混响比例联动。 |
 | Doppler Effect | 根据距离变化和速度模拟多普勒音高/延迟变化。 |
 
+## 测量与分析节点
+
+| 节点 | 功能 |
+| --- | --- |
+| RMS Meter | 显示 RMS 电平 dBFS 和通道明细。 |
+| Peak Meter | 显示峰值电平、过载状态和通道明细。 |
+| LUFS Meter | 近似整体、短时、瞬时 LUFS 和响度范围 LRA。 |
+| Spectral Analyzer (FFT) | 输出 FFT 频谱图片和采样频点数据。 |
+| Spectrogram Visualizer | 生成可连接预览节点的频谱图图片。 |
+| Waveform Visualizer | 生成可连接预览节点的波形图图片。 |
+| Phase Correlation Meter | 输出 -1 到 +1 的立体声相位相关性。 |
+| Goniometer / Vectorscope | 生成李萨如/矢量示波器图片。 |
+| BPM / Tempo Detector | 估算 BPM 并输出节拍时间列表。 |
+| Key / Pitch Detector | 估算主频率和最近音名。 |
+| Transient / Onset Detector | 检测起始点时间列表。 |
+| Silence Detector | 检测低于阈值的静音段落。 |
+
+## 信号发生器节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Sine Wave Generator | 正弦波：频率、振幅、时长、采样率、声道数。 |
+| White / Pink / Brown Noise | 白噪声、粉噪声或棕噪声测试信号。 |
+| Sweep / Chirp | 线性或对数扫频信号。 |
+| Impulse | 单采样脉冲或短点击音。 |
+| Oscillator (Multi-wave) | 正弦、三角、锯齿、方波，可调占空比。 |
+| Click Track / Metronome | 按 BPM、拍号和小节数生成节拍器。 |
+
+## 路由与混音节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Audio Mixer (N channels) | 最多 8 路输入，每路有增益、声像、静音、独奏和主增益。 |
+| Audio Router / Selector | 按索引选择一路音频输出。 |
+| Audio Splitter | 拆分最多 4 路单声道输出。 |
+| Audio Merger | 将多个单声道合并为立体声或多通道。 |
+| Crossfader | 在两路输入间线性或等功率交叉淡化。 |
+| Sidechain Gate / Compressor | 使用外部侧链输入控制门限或压缩。 |
+| Send/Return Loop | 用于效果发送/返回流程的干声与返回信号混合。 |
+
+## 实用工具节点
+
+| 节点 | 功能 |
+| --- | --- |
+| Gain / Trim | 简单 dB 增益。 |
+| Phase Inverter | 反转单声道、左声道和/或右声道极性。 |
+| DC Offset Remover | 均值移除或高通去除直流偏移。 |
+| Fade In / Fade Out | 线性、指数或 S 曲线淡入淡出。 |
+| Audio Trim / Crop | 按时间裁剪音频片段。 |
+| Silence Trimmer | 自动切除首尾静音。 |
+| Normalize (Peak / RMS / LUFS) | 峰值、RMS 或近似 LUFS 归一化。 |
+| Resample / Change Sample Rate | 高质量多相重采样。 |
+| Format Converter (Mono/Stereo) | 单声道混合、声道选择或立体声复制。 |
+| Audio Info | 采样率、时长、声道数、采样数和元数据文本。 |
+| Delay Compensation | 手动添加采样点或毫秒延迟。 |
+| Loop / Duplicator | 按次数循环或重复到目标时长。 |
+| Reverse Audio | 反转音频播放方向。 |
+
 ## 目录结构
 
 ```text
@@ -160,12 +222,16 @@ LUFS 节点内置近似 BS.1770/EBU R128 的实现：包含 K-weighting、整体
 DSP 实现已按分类拆分：
 
 - `common.py`：音频张量、滤波、包络、电平和干湿混合等公共工具。
+- `analysis.py`：电平测量、检测器和预览图片生成。
 - `dynamics.py`：压缩、限制、噪声门、扩展、齿音消除、多段压缩、自动增益和响度处理。
 - `delay.py`：延迟与回声处理。
 - `equalizers.py`：均衡与滤波处理。
+- `generators.py`：测试音、噪声、扫频、脉冲、振荡器和节拍器。
 - `modulation.py`：合唱、镶边、移相、震音、颤音、旋转扬声器、环形调制、声像和 Uni-vibe。
 - `pitch_time.py`：变调、时间伸缩、和声、音高修正、经典重采样和变速播放。
 - `reverb.py`：卷积混响、算法混响、门控混响和反向混响。
+- `routing.py`：混音、选择、拆分、合并、交叉淡化、侧链和发送/返回。
 - `saturation.py`：削波、饱和、法兹、比特粉碎、过载、波折和激励器。
 - `stereo.py`：声像、立体声宽度、Mid/Side、Haas 增强、声道交换和低频单声道化。
 - `spatial.py`：双耳声像、可选 SOFA HRTF、一阶 Ambisonics、距离和多普勒处理。
+- `utilities.py`：增益、极性、直流偏移、淡化、裁剪、归一化、重采样、格式、信息、延迟、循环和反转工具。

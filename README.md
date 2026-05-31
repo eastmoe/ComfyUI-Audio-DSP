@@ -23,6 +23,10 @@ Right-click menu:
 `eastmoe -> Comfy-Audio-DSP -> Pitch & Time`
 `eastmoe -> Comfy-Audio-DSP -> Stereo Imaging`
 `eastmoe -> Comfy-Audio-DSP -> Spatial & 3D`
+`eastmoe -> Comfy-Audio-DSP -> Metering & Analysis`
+`eastmoe -> Comfy-Audio-DSP -> Signal Generators`
+`eastmoe -> Comfy-Audio-DSP -> Routing & Mixing`
+`eastmoe -> Comfy-Audio-DSP -> Utilities`
 
 ## Dynamics Nodes
 
@@ -142,6 +146,64 @@ Right-click menu:
 | Distance Simulator | Distance gain, air absorption, predelay, and reverb blend. |
 | Doppler Effect | Doppler pitch and delay from changing distance and velocity. |
 
+## Metering & Analysis Nodes
+
+| Node | Summary |
+| --- | --- |
+| RMS Meter | RMS level in dBFS with channel details. |
+| Peak Meter | Peak level, overload flag, and channel details. |
+| LUFS Meter | Approximate integrated, short-term, momentary LUFS and LRA. |
+| Spectral Analyzer (FFT) | FFT spectrum image plus sampled bin data. |
+| Spectrogram Visualizer | Spectrogram image for preview nodes. |
+| Waveform Visualizer | Waveform image for preview nodes. |
+| Phase Correlation Meter | Stereo correlation from -1 to +1. |
+| Goniometer / Vectorscope | Lissajous vectorscope image. |
+| BPM / Tempo Detector | BPM estimate and beat time list. |
+| Key / Pitch Detector | Dominant pitch and nearest pitch class. |
+| Transient / Onset Detector | Onset time list. |
+| Silence Detector | Silent range list below a threshold. |
+
+## Signal Generators Nodes
+
+| Node | Summary |
+| --- | --- |
+| Sine Wave Generator | Frequency, amplitude, duration, sample rate, channels. |
+| White / Pink / Brown Noise | Test noise with type, amplitude, duration, and seed. |
+| Sweep / Chirp | Linear or logarithmic sweep. |
+| Impulse | Single-sample impulse or short click. |
+| Oscillator (Multi-wave) | Sine, triangle, saw, or square oscillator with duty cycle. |
+| Click Track / Metronome | BPM, time signature, and bar count click track. |
+
+## Routing & Mixing Nodes
+
+| Node | Summary |
+| --- | --- |
+| Audio Mixer (N channels) | Up to 8 inputs with gain, pan, mute, solo, and master gain. |
+| Audio Router / Selector | Selects one input by index. |
+| Audio Splitter | Splits up to four mono channel outputs. |
+| Audio Merger | Merges mono inputs to stereo or multichannel audio. |
+| Crossfader | Equal-power or linear crossfade between two inputs. |
+| Sidechain Gate / Compressor | Uses external sidechain key input. |
+| Send/Return Loop | Dry/return blend for effect-send workflows. |
+
+## Utilities Nodes
+
+| Node | Summary |
+| --- | --- |
+| Gain / Trim | Simple dB gain. |
+| Phase Inverter | Polarity inversion for mono, left, and/or right. |
+| DC Offset Remover | Mean removal or high-pass DC filtering. |
+| Fade In / Fade Out | Linear, exponential, or S-curve fades. |
+| Audio Trim / Crop | Time-based crop. |
+| Silence Trimmer | Automatic leading/trailing silence trim. |
+| Normalize (Peak / RMS / LUFS) | Peak, RMS, or approximate LUFS normalization. |
+| Resample / Change Sample Rate | High-quality polyphase resampling. |
+| Format Converter (Mono/Stereo) | Mono mix, channel select, or stereo duplicate. |
+| Audio Info | Sample rate, duration, channels, samples, and metadata text. |
+| Delay Compensation | Adds manual sample/ms delay. |
+| Loop / Duplicator | Repeats by loop count or target duration. |
+| Reverse Audio | Reverses playback direction. |
+
 ## Repository Layout
 
 ```text
@@ -161,12 +223,16 @@ ceiling protection by batch peak limiting.
 The DSP implementation is split by category:
 
 - `common.py`: shared audio tensor, filtering, metering, and mix helpers.
+- `analysis.py`: metering values, detection helpers, and generated preview images.
 - `dynamics.py`: compressor, limiter, gate, expander, de-esser, multiband, gain, and loudness processors.
 - `delay.py`: delay and echo processors.
 - `equalizers.py`: equalizer and filter processors.
+- `generators.py`: test tones, noise, sweeps, impulses, oscillators, and click tracks.
 - `modulation.py`: chorus, flanger, phaser, tremolo, vibrato, rotary, ring modulation, panning, and Uni-vibe processors.
 - `pitch_time.py`: pitch shifting, time stretching, harmonizing, correction, classic resampling, and varispeed processors.
 - `reverb.py`: convolution, algorithmic, gated, and reverse reverbs.
+- `routing.py`: mixing, selection, splitting, merging, crossfading, sidechain, and send/return processors.
 - `saturation.py`: clipping, saturation, fuzz, bit crushing, overdrive, wavefolding, and exciter processors.
 - `stereo.py`: panning, stereo width, Mid/Side tools, Haas widening, channel swap, and mono-maker processors.
 - `spatial.py`: binaural panning, optional SOFA HRTF convolution, first-order Ambisonics, distance, and Doppler processors.
+- `utilities.py`: gain, polarity, DC removal, fades, trim, normalize, resample, format, info, delay, loop, and reverse tools.

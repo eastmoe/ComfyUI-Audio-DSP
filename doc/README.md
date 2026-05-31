@@ -14,3 +14,7 @@ Implemented groups are available in the ComfyUI right-click menu under
 - Pitch & Time
 - Stereo Imaging
 - Spatial & 3D
+- Metering & Analysis
+- Signal Generators
+- Routing & Mixing
+- Utilities
