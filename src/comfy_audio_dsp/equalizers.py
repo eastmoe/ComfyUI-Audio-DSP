@@ -25,6 +25,7 @@ from .common import (
 FILTER_TYPES = ["low_shelf", "high_shelf", "peak", "low_pass", "high_pass", "band_pass", "band_stop", "notch"]
 SPECTRAL_SHAPER_MODES = ["smooth", "enhance"]
 HUM_BASE_MODES = ["auto", "50", "60"]
+LINEAR_PHASE_EQ_TYPES = ["peak", "low_shelf", "high_shelf", "low_pass", "high_pass"]
 GRAPHIC_EQ_BANDS = {
     "10": [31.5, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0],
     "15": [25.0, 40.0, 63.0, 100.0, 160.0, 250.0, 400.0, 630.0, 1000.0, 1600.0, 2500.0, 4000.0, 6300.0, 10000.0, 16000.0],
@@ -367,3 +368,47 @@ def hum_remover(audio: dict, base_mode: str, max_harmonics: int, q: float, reduc
         notched = ba_filter_waveform(wet, b, a, zero_phase=False)
         wet = wet.lerp(notched, depth)
     return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def linear_phase_eq(audio: dict, band_type: str, frequency_hz: float, gain_db: float, q: float, slope: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    data = flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    freqs = np.fft.rfftfreq(data.shape[-1], d=1.0 / sample_rate)
+    freq = max(20.0, min(float(frequency_hz), sample_rate * 0.49))
+    q = max(0.1, float(q))
+    if band_type == "low_pass":
+        response_db = -abs(float(gain_db)) / (1.0 + np.exp(-(freqs - freq) / max(float(slope), 1.0)))
+    elif band_type == "high_pass":
+        response_db = -abs(float(gain_db)) / (1.0 + np.exp((freqs - freq) / max(float(slope), 1.0)))
+    elif band_type == "low_shelf":
+        response_db = float(gain_db) / (1.0 + np.exp((freqs - freq) / max(float(slope), 1.0)))
+    elif band_type == "high_shelf":
+        response_db = float(gain_db) / (1.0 + np.exp(-(freqs - freq) / max(float(slope), 1.0)))
+    else:
+        sigma = max(freq / q, 5.0)
+        response_db = float(gain_db) * np.exp(-0.5 * ((freqs - freq) / sigma) ** 2)
+    response = (10.0 ** (response_db / 20.0)).astype(np.float32)
+    wet_np = np.fft.irfft(np.fft.rfft(data, axis=-1) * response[None, :], n=data.shape[-1], axis=-1).astype(np.float32)
+    wet = restore_channels(torch.from_numpy(wet_np).to(device=waveform.device, dtype=waveform.dtype), shape)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def comb_filter(audio: dict, delay_ms: float, feedback: float, feedforward: float, damping_hz: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = waveform.detach().cpu().numpy().astype(np.float32, copy=False)
+    delay = max(1, int(round(float(delay_ms) * sample_rate / 1000.0)))
+    feedback = max(-0.98, min(float(feedback), 0.98))
+    feedforward = max(-2.0, min(float(feedforward), 2.0))
+    wet = np.zeros_like(data, dtype=np.float32)
+    damping = np.exp(-2.0 * np.pi * max(20.0, float(damping_hz)) / sample_rate)
+    for b in range(data.shape[0]):
+        for c in range(data.shape[1]):
+            lp = 0.0
+            for n in range(data.shape[-1]):
+                delayed_y = wet[b, c, n - delay] if n >= delay else 0.0
+                delayed_x = data[b, c, n - delay] if n >= delay else 0.0
+                lp = (1.0 - damping) * delayed_y + damping * lp
+                wet[b, c, n] = data[b, c, n] + feedforward * delayed_x + feedback * lp
+    wet_tensor = torch.from_numpy(wet).to(device=waveform.device, dtype=waveform.dtype)
+    return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))

@@ -3,11 +3,11 @@ from __future__ import annotations
 from . import dsp
 from . import localization as loc
 from .delay import NOTE_VALUES
-from .equalizers import FILTER_TYPES, GRAPHIC_EQ_BANDS, HUM_BASE_MODES, SPECTRAL_SHAPER_MODES
-from .generators import NOISE_TYPES, OSCILLATOR_WAVES, SWEEP_MODES
-from .modulation import WAVEFORMS
+from .equalizers import FILTER_TYPES, GRAPHIC_EQ_BANDS, HUM_BASE_MODES, LINEAR_PHASE_EQ_TYPES, SPECTRAL_SHAPER_MODES
+from .generators import NOISE_TYPES, OSCILLATOR_WAVES, SWEEP_MODES, WAVETABLES
+from .modulation import AUTO_FILTER_TYPES, WAVEFORMS
 from .pitch_time import PITCH_KEYS, PITCH_SCALES
-from .spatial import SPATIAL_DECODER_MODES
+from .spatial import HOA_ORDERS, SPATIAL_DECODER_MODES
 from .stereo import MID_SIDE_EQ_FILTER_TYPES
 from .utilities import FADE_CURVES, FORMAT_MODES, NORMALIZE_MODES
 
@@ -2295,6 +2295,322 @@ class ComfyAudioDSPMathSignalMixer(_AudioDSPNode):
         return (dsp.math_signal_mixer(audio_a, audio_b, audio_c, audio_d, expression, gain_db),)
 
 
+class ComfyAudioDSPUpwardCompressor(_AudioDSPNode):
+    CATEGORY = CATEGORY_DYNAMICS
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPUpwardCompressor", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPUpwardCompressor", "Raises low-level material below a threshold.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "upward_compressor"
+        return cls._finish({"threshold_db": _float(section, "threshold_db", -36.0, -100.0, 0.0), "ratio": _float(section, "ratio", 2.0, 1.0, 20.0), "attack_ms": _float(section, "attack_ms", 20.0, 0.0, 1000.0), "release_ms": _float(section, "release_ms", 250.0, 1.0, 5000.0, 1.0), "range_db": _float(section, "range_db", 18.0, 0.0, 60.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, threshold_db, ratio, attack_ms, release_ms, range_db, mix):
+        return (dsp.upward_compressor(audio, threshold_db, ratio, attack_ms, release_ms, range_db, mix),)
+
+
+class ComfyAudioDSPParallelCompressionMix(_AudioDSPNode):
+    CATEGORY = CATEGORY_DYNAMICS
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPParallelCompressionMix", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPParallelCompressionMix", "Blends dry audio with a compressed parallel path.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "parallel_compression_mix"
+        return cls._finish({"threshold_db": _float(section, "threshold_db", -24.0, -80.0, 0.0), "ratio": _float(section, "ratio", 8.0, 1.0, 50.0), "attack_ms": _float(section, "attack_ms", 5.0, 0.0, 500.0), "release_ms": _float(section, "release_ms", 120.0, 1.0, 5000.0, 1.0), "knee_db": _float(section, "knee_db", 6.0, 0.0, 48.0), "compressed_gain_db": _float(section, "compressed_gain_db", 6.0, -24.0, 48.0, 0.1), "dry_gain_db": _float(section, "dry_gain_db", 0.0, -24.0, 24.0, 0.1), "blend": _float(section, "blend", 0.5, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, threshold_db, ratio, attack_ms, release_ms, knee_db, compressed_gain_db, dry_gain_db, blend):
+        return (dsp.parallel_compression_mix(audio, threshold_db, ratio, attack_ms, release_ms, knee_db, compressed_gain_db, dry_gain_db, blend),)
+
+
+class ComfyAudioDSPLinearPhaseEQ(_AudioDSPNode):
+    CATEGORY = CATEGORY_EQ
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPLinearPhaseEQ", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPLinearPhaseEQ", "Zero-phase FFT EQ for linear-phase-style magnitude shaping.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "linear_phase_eq"
+        return cls._finish({"band_type": _combo(section, "band_type", LINEAR_PHASE_EQ_TYPES, "peak"), "frequency_hz": _float(section, "frequency_hz", 1000.0, 20.0, 22000.0, 1.0), "gain_db": _float(section, "gain_db", 0.0, -48.0, 48.0, 0.1), "q": _float(section, "q", 1.0, 0.1, 30.0, 0.01), "slope": _float(section, "slope", 120.0, 1.0, 5000.0, 1.0), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, band_type, frequency_hz, gain_db, q, slope, mix):
+        return (dsp.linear_phase_eq(audio, band_type, frequency_hz, gain_db, q, slope, mix),)
+
+
+class ComfyAudioDSPCombFilter(_AudioDSPNode):
+    CATEGORY = CATEGORY_EQ
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPCombFilter", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPCombFilter", "Feedforward/feedback comb filter for coloration and resonances.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "comb_filter"
+        return cls._finish({"delay_ms": _float(section, "delay_ms", 5.0, 0.05, 100.0, 0.01), "feedback": _float(section, "feedback", 0.35, -0.98, 0.98, 0.01), "feedforward": _float(section, "feedforward", 0.5, -2.0, 2.0, 0.01), "damping_hz": _float(section, "damping_hz", 8000.0, 20.0, 22000.0, 1.0), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, delay_ms, feedback, feedforward, damping_hz, mix):
+        return (dsp.comb_filter(audio, delay_ms, feedback, feedforward, damping_hz, mix),)
+
+
+class ComfyAudioDSPShimmerReverb(_AudioDSPNode):
+    CATEGORY = CATEGORY_REVERB
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPShimmerReverb", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPShimmerReverb", "Reverb with octave-shifted shimmer mixed into the tail.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "shimmer_reverb"
+        return cls._finish({"reverb_time_s": _float(section, "reverb_time_s", 3.0, 0.1, 30.0), "diffusion": _float(section, "diffusion", 0.8, 0.0, 1.0, 0.01), "shimmer_octaves": _float(section, "shimmer_octaves", 1.0, -2.0, 2.0, 0.01), "shimmer_amount": _float(section, "shimmer_amount", 0.5, 0.0, 2.0, 0.01), "high_cut_hz": _float(section, "high_cut_hz", 12000.0, 500.0, 22000.0, 1.0), "mix": _float(section, "mix", 0.35, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, reverb_time_s, diffusion, shimmer_octaves, shimmer_amount, high_cut_hz, mix):
+        return (dsp.shimmer_reverb(audio, reverb_time_s, diffusion, shimmer_octaves, shimmer_amount, high_cut_hz, mix),)
+
+
+class ComfyAudioDSPReverseDelay(_AudioDSPNode):
+    CATEGORY = CATEGORY_DELAY
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPReverseDelay", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPReverseDelay", "Reverse-style delay by delaying reversed audio then flipping it back.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "reverse_delay"
+        return cls._finish({"delay_ms": _float(section, "delay_ms", 350.0, 1.0, 5000.0, 1.0), "feedback": _float(section, "feedback", 0.25, -0.95, 0.95, 0.01), "mix": _float(section, "mix", 0.35, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, delay_ms, feedback, mix):
+        return (dsp.reverse_delay(audio, delay_ms, feedback, mix),)
+
+
+class ComfyAudioDSPGranularDelay(_AudioDSPNode):
+    CATEGORY = CATEGORY_DELAY
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPGranularDelay", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPGranularDelay", "Delay whose wet path is broken into jittered grains.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "granular_delay"
+        return cls._finish({"delay_ms": _float(section, "delay_ms", 300.0, 1.0, 5000.0, 1.0), "grain_ms": _float(section, "grain_ms", 60.0, 1.0, 1000.0, 0.1), "density": _float(section, "density", 2.0, 1.0, 16.0, 0.1), "pitch_semitones": _float(section, "pitch_semitones", 0.0, -24.0, 24.0, 0.01), "feedback": _float(section, "feedback", 0.25, -0.95, 0.95, 0.01), "seed": _int(section, "seed", 0, 0, 2147483647), "mix": _float(section, "mix", 0.35, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, delay_ms, grain_ms, density, pitch_semitones, feedback, seed, mix):
+        return (dsp.granular_delay(audio, delay_ms, grain_ms, density, pitch_semitones, feedback, seed, mix),)
+
+
+class ComfyAudioDSPSlapEcho(_AudioDSPNode):
+    CATEGORY = CATEGORY_DELAY
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSlapEcho", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPSlapEcho", "Preset slapback echo styles.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "slap_echo"
+        return cls._finish({"style": _combo(section, "style", ["classic", "rockabilly", "wide"], "classic"), "mix": _float(section, "mix", 0.25, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, style, mix):
+        return (dsp.slap_echo(audio, style, mix),)
+
+
+class ComfyAudioDSPBarberpoleFlanger(_AudioDSPNode):
+    CATEGORY = CATEGORY_MODULATION
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPBarberpoleFlanger", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPBarberpoleFlanger", "Continuously rising or falling flanger illusion.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "barberpole_flanger"
+        return cls._finish({"base_delay_ms": _float(section, "base_delay_ms", 1.0, 0.1, 20.0, 0.01), "depth_ms": _float(section, "depth_ms", 6.0, 0.0, 30.0, 0.01), "rate_hz": _float(section, "rate_hz", 0.15, 0.001, 5.0, 0.001), "feedback": _float(section, "feedback", 0.25, -0.95, 0.95, 0.01), "direction": _combo(section, "direction", ["up", "down"], "up"), "mix": _float(section, "mix", 0.5, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, base_delay_ms, depth_ms, rate_hz, feedback, direction, mix):
+        return (dsp.barberpole_flanger(audio, base_delay_ms, depth_ms, rate_hz, feedback, direction, mix),)
+
+
+class ComfyAudioDSPAutoFilter(_AudioDSPNode):
+    CATEGORY = CATEGORY_MODULATION
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPAutoFilter", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPAutoFilter", "LFO-controlled filter sweep.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "auto_filter"
+        return cls._finish({"filter_type": _combo(section, "filter_type", AUTO_FILTER_TYPES, "low_pass"), "base_cutoff_hz": _float(section, "base_cutoff_hz", 1000.0, 20.0, 22000.0, 1.0), "depth_octaves": _float(section, "depth_octaves", 2.0, 0.0, 8.0, 0.01), "rate_hz": _float(section, "rate_hz", 0.5, 0.001, 30.0, 0.001), "resonance_q": _float(section, "resonance_q", 1.0, 0.1, 10.0, 0.01), "waveform_shape": _combo(section, "waveform_shape", WAVEFORMS, "sine"), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, filter_type, base_cutoff_hz, depth_octaves, rate_hz, resonance_q, waveform_shape, mix):
+        return (dsp.auto_filter(audio, filter_type, base_cutoff_hz, depth_octaves, rate_hz, resonance_q, waveform_shape, mix),)
+
+
+class ComfyAudioDSPFoldClip(_AudioDSPNode):
+    CATEGORY = CATEGORY_SATURATION
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPFoldClip", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPFoldClip", "Hybrid wavefolding and clipping distortion.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "fold_clip"
+        return cls._finish({"drive_db": _float(section, "drive_db", 12.0, 0.0, 80.0, 0.1), "fold_amount": _float(section, "fold_amount", 2.0, 1.0, 16.0, 0.1), "clip_threshold": _float(section, "clip_threshold", 0.7, 0.01, 2.0, 0.01), "mode": _combo(section, "mode", ["blend", "fold_then_clip", "clip_then_fold"], "blend"), "output_gain_db": _float(section, "output_gain_db", -6.0, -60.0, 24.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, drive_db, fold_amount, clip_threshold, mode, output_gain_db, mix):
+        return (dsp.fold_clip(audio, drive_db, fold_amount, clip_threshold, mode, output_gain_db, mix),)
+
+
+class ComfyAudioDSPAmpSimulator(_AudioDSPNode):
+    CATEGORY = CATEGORY_SATURATION
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPAmpSimulator", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPAmpSimulator", "Simple amp and cabinet simulator with drive, tone, and presence.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "amp_simulator"
+        return cls._finish({"drive_db": _float(section, "drive_db", 18.0, 0.0, 80.0, 0.1), "tone": _float(section, "tone", 0.55, 0.0, 1.0, 0.01), "cabinet": _combo(section, "cabinet", ["closed_back", "open_back"], "closed_back"), "presence": _float(section, "presence", 0.5, 0.0, 2.0, 0.01), "output_gain_db": _float(section, "output_gain_db", -9.0, -60.0, 24.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, drive_db, tone, cabinet, presence, output_gain_db, mix):
+        return (dsp.amp_simulator(audio, drive_db, tone, cabinet, presence, output_gain_db, mix),)
+
+
+class ComfyAudioDSPFormantShifter(_AudioDSPNode):
+    CATEGORY = CATEGORY_PITCH_TIME
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPFormantShifter", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPFormantShifter", "Shifts spectral-envelope formants without intentionally changing timing.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "formant_shifter"
+        return cls._finish({"shift_ratio": _float(section, "shift_ratio", 1.0, 0.25, 4.0, 0.01), "fft_size": _int(section, "fft_size", 2048, 128, 32768, 64), "hop_size": _int(section, "hop_size", 512, 16, 8192, 16), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, shift_ratio, fft_size, hop_size, mix):
+        return (dsp.formant_shifter(audio, shift_ratio, fft_size, hop_size, mix),)
+
+
+class ComfyAudioDSPPolyphonicPitchCorrection(_AudioDSPNode):
+    CATEGORY = CATEGORY_PITCH_TIME
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPPolyphonicPitchCorrection", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPPolyphonicPitchCorrection", "Spectral pitch-class correction for polyphonic material.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "polyphonic_pitch_correction"
+        return cls._finish({"key": _combo(section, "key", PITCH_KEYS, "C"), "scale": _combo(section, "scale", PITCH_SCALES, "major"), "correction_amount": _float(section, "correction_amount", 0.5, 0.0, 1.0, 0.01), "attenuation_db": _float(section, "attenuation_db", 12.0, 0.0, 60.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+
+    def process(self, audio, key, scale, correction_amount, attenuation_db, mix):
+        return (dsp.polyphonic_pitch_correction(audio, key, scale, correction_amount, attenuation_db, mix),)
+
+
+class ComfyAudioDSPTruePeakMeter(_AudioDSPNode):
+    CATEGORY = CATEGORY_METERING
+    RETURN_TYPES = ("AUDIO", "FLOAT", "BOOLEAN", "STRING")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPTruePeakMeter", ("audio", "true_peak_dbfs", "overload", "details"))
+    DESCRIPTION = loc.description("ComfyAudioDSPTruePeakMeter", "Oversampled true-peak meter.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return cls._finish({"oversample": _int("true_peak_meter", "oversample", 4, 1, 16)}, "true_peak_meter")
+
+    def process(self, audio, oversample):
+        return dsp.true_peak_meter(audio, oversample)
+
+
+class ComfyAudioDSPDynamicRangeDRMeter(_AudioDSPNode):
+    CATEGORY = CATEGORY_METERING
+    RETURN_TYPES = ("AUDIO", "FLOAT", "FLOAT", "FLOAT", "STRING")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPDynamicRangeDRMeter", ("audio", "dr", "peak_dbfs", "top_rms_dbfs", "details"))
+    DESCRIPTION = loc.description("ComfyAudioDSPDynamicRangeDRMeter", "Crest-factor style dynamic range meter.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return cls._finish({"block_ms": _float("dynamic_range_dr_meter", "block_ms", 3000.0, 50.0, 30000.0, 10.0)}, "dynamic_range_dr_meter")
+
+    def process(self, audio, block_ms):
+        return dsp.dynamic_range_dr_meter(audio, block_ms)
+
+
+class ComfyAudioDSPVBAPPanner(_AudioDSPNode):
+    CATEGORY = CATEGORY_SPATIAL
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPVBAPPanner", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPVBAPPanner", "VBAP-style panner for arbitrary speaker angle layouts.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "vbap_panner"
+        return cls._finish({"azimuth_deg": _float(section, "azimuth_deg", 0.0, -180.0, 180.0, 1.0), "speaker_angles_deg": _string(section, "speaker_angles_deg", "-30,30"), "spread": _float(section, "spread", 0.0, 0.0, 180.0, 1.0), "normalize": _bool(section, "normalize", True)}, section)
+
+    def process(self, audio, azimuth_deg, speaker_angles_deg, spread, normalize):
+        return (dsp.vbap_panner(audio, azimuth_deg, speaker_angles_deg, spread, normalize),)
+
+
+class ComfyAudioDSPHigherOrderAmbisonicsEncoder(_AudioDSPNode):
+    CATEGORY = CATEGORY_SPATIAL
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPHigherOrderAmbisonicsEncoder", ("audio",))
+    DESCRIPTION = loc.description("ComfyAudioDSPHigherOrderAmbisonicsEncoder", "Encodes mono audio to approximate higher-order Ambisonics channels.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "higher_order_ambisonics_encoder"
+        return cls._finish({"order": _combo(section, "order", HOA_ORDERS, "2"), "azimuth_deg": _float(section, "azimuth_deg", 0.0, -180.0, 180.0, 1.0), "elevation_deg": _float(section, "elevation_deg", 0.0, -90.0, 90.0, 1.0), "gain_db": _float(section, "gain_db", 0.0, -24.0, 24.0, 0.1)}, section)
+
+    def process(self, audio, order, azimuth_deg, elevation_deg, gain_db):
+        return (dsp.higher_order_ambisonics_encoder(audio, order, azimuth_deg, elevation_deg, gain_db),)
+
+
+class ComfyAudioDSPFMOperator:
+    CATEGORY = CATEGORY_GENERATORS
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPFMOperator", ("audio",))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPFMOperator", "FM operator tone generator.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "fm_operator"
+        return {"required": {"carrier_hz": _float(section, "carrier_hz", 220.0, 0.01, 22000.0, 0.01), "modulator_hz": _float(section, "modulator_hz", 440.0, 0.01, 22000.0, 0.01), "modulation_index": _float(section, "modulation_index", 2.0, 0.0, 50.0, 0.01), "amplitude": _float(section, "amplitude", 0.25, 0.0, 1.0, 0.01), "duration_s": _float(section, "duration_s", 1.0, 0.001, 3600.0, 0.001), "sample_rate": _int(section, "sample_rate", 44100, 8000, 384000, 1), "channels": _int(section, "channels", 2, 1, 8)}}
+
+    def process(self, carrier_hz, modulator_hz, modulation_index, amplitude, duration_s, sample_rate, channels):
+        return (dsp.fm_operator(carrier_hz, modulator_hz, modulation_index, amplitude, duration_s, sample_rate, channels),)
+
+
+class ComfyAudioDSPKarplusStrongString:
+    CATEGORY = CATEGORY_GENERATORS
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPKarplusStrongString", ("audio",))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPKarplusStrongString", "Plucked-string synthesis with Karplus-Strong feedback.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "karplus_strong_string"
+        return {"required": {"frequency_hz": _float(section, "frequency_hz", 110.0, 1.0, 8000.0, 0.01), "decay": _float(section, "decay", 0.995, 0.0, 0.9999, 0.0001), "brightness": _float(section, "brightness", 0.7, 0.0, 1.0, 0.01), "duration_s": _float(section, "duration_s", 2.0, 0.001, 3600.0, 0.001), "sample_rate": _int(section, "sample_rate", 44100, 8000, 384000, 1), "seed": _int(section, "seed", 0, 0, 2147483647)}}
+
+    def process(self, frequency_hz, decay, brightness, duration_s, sample_rate, seed):
+        return (dsp.karplus_strong_string(frequency_hz, decay, brightness, duration_s, sample_rate, seed),)
+
+
+class ComfyAudioDSPWavetableOscillator:
+    CATEGORY = CATEGORY_GENERATORS
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPWavetableOscillator", ("audio",))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPWavetableOscillator", "Wavetable oscillator with built-in table shapes.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "wavetable_oscillator"
+        return {"required": {"wavetable": _combo(section, "wavetable", WAVETABLES, "sine"), "frequency_hz": _float(section, "frequency_hz", 440.0, 0.01, 22000.0, 0.01), "amplitude": _float(section, "amplitude", 0.25, 0.0, 1.0, 0.01), "duration_s": _float(section, "duration_s", 1.0, 0.001, 3600.0, 0.001), "sample_rate": _int(section, "sample_rate", 44100, 8000, 384000, 1), "table_size": _int(section, "table_size", 2048, 16, 65536, 16), "channels": _int(section, "channels", 2, 1, 8)}}
+
+    def process(self, wavetable, frequency_hz, amplitude, duration_s, sample_rate, table_size, channels):
+        return (dsp.wavetable_oscillator(wavetable, frequency_hz, amplitude, duration_s, sample_rate, table_size, channels),)
+
+
+class ComfyAudioDSPSamplePlayer:
+    CATEGORY = CATEGORY_GENERATORS
+    RETURN_TYPES = ("AUDIO",)
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSamplePlayer", ("audio",))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPSamplePlayer", "Loads a WAV sample, optionally trims, loops, gains, and resamples it.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "sample_player"
+        return {"required": {"path": _string(section, "path"), "target_sample_rate": _int(section, "target_sample_rate", 44100, 0, 384000, 1), "start_s": _float(section, "start_s", 0.0, 0.0, 36000.0, 0.001), "duration_s": _float(section, "duration_s", 0.0, 0.0, 36000.0, 0.001), "gain_db": _float(section, "gain_db", 0.0, -60.0, 24.0, 0.1), "loop": _bool(section, "loop", False)}}
+
+    def process(self, path, target_sample_rate, start_s, duration_s, gain_db, loop):
+        return (dsp.sample_player(path, target_sample_rate, start_s, duration_s, gain_db, loop),)
+
+
 NODE_CLASS_MAPPINGS = {
     "ComfyAudioDSPCompressor": ComfyAudioDSPCompressor,
     "ComfyAudioDSPLimiter": ComfyAudioDSPLimiter,
@@ -2417,6 +2733,28 @@ NODE_CLASS_MAPPINGS = {
     "ComfyAudioDSPPhaseRotatorAllpass": ComfyAudioDSPPhaseRotatorAllpass,
     "ComfyAudioDSPGranularProcessor": ComfyAudioDSPGranularProcessor,
     "ComfyAudioDSPMathSignalMixer": ComfyAudioDSPMathSignalMixer,
+    "ComfyAudioDSPUpwardCompressor": ComfyAudioDSPUpwardCompressor,
+    "ComfyAudioDSPParallelCompressionMix": ComfyAudioDSPParallelCompressionMix,
+    "ComfyAudioDSPLinearPhaseEQ": ComfyAudioDSPLinearPhaseEQ,
+    "ComfyAudioDSPCombFilter": ComfyAudioDSPCombFilter,
+    "ComfyAudioDSPShimmerReverb": ComfyAudioDSPShimmerReverb,
+    "ComfyAudioDSPReverseDelay": ComfyAudioDSPReverseDelay,
+    "ComfyAudioDSPGranularDelay": ComfyAudioDSPGranularDelay,
+    "ComfyAudioDSPSlapEcho": ComfyAudioDSPSlapEcho,
+    "ComfyAudioDSPBarberpoleFlanger": ComfyAudioDSPBarberpoleFlanger,
+    "ComfyAudioDSPAutoFilter": ComfyAudioDSPAutoFilter,
+    "ComfyAudioDSPFoldClip": ComfyAudioDSPFoldClip,
+    "ComfyAudioDSPAmpSimulator": ComfyAudioDSPAmpSimulator,
+    "ComfyAudioDSPFormantShifter": ComfyAudioDSPFormantShifter,
+    "ComfyAudioDSPPolyphonicPitchCorrection": ComfyAudioDSPPolyphonicPitchCorrection,
+    "ComfyAudioDSPTruePeakMeter": ComfyAudioDSPTruePeakMeter,
+    "ComfyAudioDSPDynamicRangeDRMeter": ComfyAudioDSPDynamicRangeDRMeter,
+    "ComfyAudioDSPVBAPPanner": ComfyAudioDSPVBAPPanner,
+    "ComfyAudioDSPHigherOrderAmbisonicsEncoder": ComfyAudioDSPHigherOrderAmbisonicsEncoder,
+    "ComfyAudioDSPFMOperator": ComfyAudioDSPFMOperator,
+    "ComfyAudioDSPKarplusStrongString": ComfyAudioDSPKarplusStrongString,
+    "ComfyAudioDSPWavetableOscillator": ComfyAudioDSPWavetableOscillator,
+    "ComfyAudioDSPSamplePlayer": ComfyAudioDSPSamplePlayer,
 }
 
 _DISPLAY_FALLBACKS = {
@@ -2541,6 +2879,28 @@ _DISPLAY_FALLBACKS = {
     "ComfyAudioDSPPhaseRotatorAllpass": "Phase Rotator / All-Pass Filter",
     "ComfyAudioDSPGranularProcessor": "Granular Processor",
     "ComfyAudioDSPMathSignalMixer": "Math / Signal Mixer",
+    "ComfyAudioDSPUpwardCompressor": "Upward Compressor",
+    "ComfyAudioDSPParallelCompressionMix": "Parallel Compression Mix",
+    "ComfyAudioDSPLinearPhaseEQ": "Linear Phase EQ",
+    "ComfyAudioDSPCombFilter": "Comb Filter",
+    "ComfyAudioDSPShimmerReverb": "Shimmer Reverb",
+    "ComfyAudioDSPReverseDelay": "Reverse Delay",
+    "ComfyAudioDSPGranularDelay": "Granular Delay",
+    "ComfyAudioDSPSlapEcho": "Slap Echo",
+    "ComfyAudioDSPBarberpoleFlanger": "Barberpole Flanger",
+    "ComfyAudioDSPAutoFilter": "Auto-Filter",
+    "ComfyAudioDSPFoldClip": "Fold & Clip",
+    "ComfyAudioDSPAmpSimulator": "Amp Simulator",
+    "ComfyAudioDSPFormantShifter": "Formant Shifter",
+    "ComfyAudioDSPPolyphonicPitchCorrection": "Polyphonic Pitch Correction",
+    "ComfyAudioDSPTruePeakMeter": "True Peak Meter",
+    "ComfyAudioDSPDynamicRangeDRMeter": "Dynamic Range DR Meter",
+    "ComfyAudioDSPVBAPPanner": "VBAP Panner",
+    "ComfyAudioDSPHigherOrderAmbisonicsEncoder": "Higher-Order Ambisonics Encoder",
+    "ComfyAudioDSPFMOperator": "FM Operator",
+    "ComfyAudioDSPKarplusStrongString": "Karplus-Strong String",
+    "ComfyAudioDSPWavetableOscillator": "Wavetable Oscillator",
+    "ComfyAudioDSPSamplePlayer": "Sample Player",
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {key: loc.display_name(key, value) for key, value in _DISPLAY_FALLBACKS.items()}

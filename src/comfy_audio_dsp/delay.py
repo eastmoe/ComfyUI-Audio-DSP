@@ -156,3 +156,30 @@ def stereo_spread_delay(audio: dict, base_delay_ms: float, spread_ms: float, fee
         mid = wet_tensor.mean(dim=1, keepdim=True)
         wet_tensor = mid + (wet_tensor - mid) * float(width)
     return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))
+
+
+def reverse_delay(audio: dict, delay_ms: float, feedback: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    reversed_audio = {"waveform": torch.flip(waveform, dims=(-1,)), "sample_rate": sample_rate}
+    wet = simple_delay(reversed_audio, delay_ms, feedback, 1.0)["waveform"]
+    wet = torch.flip(wet, dims=(-1,))
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def granular_delay(audio: dict, delay_ms: float, grain_ms: float, density: float, pitch_semitones: float, feedback: float, seed: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    from .pitch_time import granular_processor, pitch_shifter
+
+    delayed = simple_delay(audio, delay_ms, feedback, 1.0)
+    grains = granular_processor(delayed, grain_ms, max(1.0, density), 0.0, grain_ms * 0.5, 0.35, 0.0, seed, 1.0)
+    if abs(float(pitch_semitones)) > 1.0e-4:
+        grains = pitch_shifter(grains, pitch_semitones, 0.0, 1.0)
+    return copy_audio(audio, mix_audio(waveform, grains["waveform"], mix))
+
+
+def slap_echo(audio: dict, style: str, mix: float) -> dict:
+    if style == "wide":
+        return stereo_spread_delay(audio, 95.0, 18.0, 0.08, 1.35, mix)
+    if style == "rockabilly":
+        return filtered_delay(audio, 115.0, 0.18, 140.0, 5200.0, mix)
+    return filtered_delay(audio, 85.0, 0.05, 120.0, 7000.0, mix)

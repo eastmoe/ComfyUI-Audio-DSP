@@ -102,3 +102,35 @@ def exciter_enhancer(audio: dict, drive_db: float, crossover_hz: float, amount: 
     harmonics = torch.tanh(high * float(db_to_amp(drive_db)))
     wet = waveform + harmonics * max(0.0, min(float(amount), 2.0))
     return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def fold_clip(audio: dict, drive_db: float, fold_amount: float, clip_threshold: float, mode: str, output_gain_db: float, mix: float) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    x = waveform * float(db_to_amp(drive_db))
+    folded = torch.asin(torch.sin(x * max(1.0, float(fold_amount)))) * (2.0 / torch.pi)
+    threshold = max(0.01, float(clip_threshold))
+    clipped = torch.clamp(x, -threshold, threshold) / threshold
+    if mode == "clip_then_fold":
+        wet = torch.asin(torch.sin(clipped * max(1.0, float(fold_amount)))) * (2.0 / torch.pi)
+    elif mode == "fold_then_clip":
+        wet = torch.clamp(folded, -threshold, threshold) / threshold
+    else:
+        wet = 0.5 * folded + 0.5 * clipped
+    wet = wet * float(db_to_amp(output_gain_db))
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def amp_simulator(audio: dict, drive_db: float, tone: float, cabinet: str, presence: float, output_gain_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    x = waveform * float(db_to_amp(drive_db))
+    wet = torch.tanh(x) + 0.18 * torch.tanh(x * 3.0)
+    wet = wet / 1.18
+    low_cut = 70.0 if cabinet == "open_back" else 95.0
+    high_cut = 4200.0 + max(0.0, min(float(tone), 1.0)) * 5200.0
+    wet = sos_filter_waveform(wet, butter_sos(sample_rate, "highpass", low_cut, order=2), zero_phase=False)
+    wet = sos_filter_waveform(wet, butter_sos(sample_rate, "lowpass", high_cut, order=4), zero_phase=False)
+    if presence > 0.0:
+        high = sos_filter_waveform(wet, butter_sos(sample_rate, "highpass", 2600.0, order=2), zero_phase=False)
+        wet = wet + high * max(0.0, min(float(presence), 2.0)) * 0.35
+    wet = wet * float(db_to_amp(output_gain_db))
+    return copy_audio(audio, mix_audio(waveform, wet, mix))

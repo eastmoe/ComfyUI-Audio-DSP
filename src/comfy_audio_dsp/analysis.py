@@ -259,3 +259,41 @@ def silence_detector(audio: dict, threshold_db: float, min_duration_ms: float) -
                 ranges.append([round(start * hop / sample_rate, 4), round(index * hop / sample_rate, 4)])
             start = None
     return copy_audio(audio, waveform), json.dumps(ranges, ensure_ascii=False), int(len(ranges))
+
+
+def true_peak_meter(audio: dict, oversample: int) -> tuple[dict, float, bool, str]:
+    waveform, _sample_rate = audio_waveform(audio)
+    data = waveform.detach().cpu().numpy().astype(np.float32, copy=False)
+    oversample = max(1, int(oversample))
+    peaks = []
+    for batch in range(data.shape[0]):
+        peak = float(np.max(np.abs(data[batch])))
+        if oversample > 1:
+            for channel in range(data.shape[1]):
+                peak = max(peak, float(np.max(np.abs(signal.resample_poly(data[batch, channel], oversample, 1)))))
+        peaks.append(peak)
+    db = 20.0 * np.log10(max(float(np.max(peaks)), 1.0e-8))
+    overload = bool(db >= 0.0)
+    return copy_audio(audio, waveform), float(db), overload, json.dumps({"true_peak_dbfs": float(db), "oversample": oversample}, ensure_ascii=False)
+
+
+def dynamic_range_dr_meter(audio: dict, block_ms: float) -> tuple[dict, float, float, float, str]:
+    waveform, sample_rate = audio_waveform(audio)
+    block = max(1, int(round(float(block_ms) * sample_rate / 1000.0)))
+    mono = waveform.mean(dim=1)
+    rms_values = []
+    peak_values = []
+    for start in range(0, mono.shape[-1], block):
+        segment = mono[..., start : min(start + block, mono.shape[-1])]
+        if segment.numel() == 0:
+            continue
+        rms_values.append(torch.sqrt(torch.mean(segment * segment, dim=-1) + AUDIO_EPS))
+        peak_values.append(torch.amax(torch.abs(segment), dim=-1))
+    rms = torch.stack(rms_values, dim=-1) if rms_values else torch.sqrt(torch.mean(mono * mono, dim=-1, keepdim=True) + AUDIO_EPS)
+    peak = torch.stack(peak_values, dim=-1) if peak_values else torch.amax(torch.abs(mono), dim=-1, keepdim=True)
+    top_count = max(1, int(math.ceil(rms.shape[-1] * 0.2)))
+    top_rms = torch.topk(rms, k=top_count, dim=-1).values.mean(dim=-1)
+    peak_db = 20.0 * torch.log10(torch.clamp(peak.amax(dim=-1), min=AUDIO_EPS))
+    rms_db = 20.0 * torch.log10(torch.clamp(top_rms, min=AUDIO_EPS))
+    dr = peak_db - rms_db
+    return copy_audio(audio, waveform), float(dr.mean().item()), float(peak_db.mean().item()), float(rms_db.mean().item()), json.dumps({"dr": dr.detach().cpu().tolist(), "peak_dbfs": peak_db.detach().cpu().tolist(), "top_rms_dbfs": rms_db.detach().cpu().tolist()}, ensure_ascii=False)

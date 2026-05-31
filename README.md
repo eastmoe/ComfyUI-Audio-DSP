@@ -41,6 +41,8 @@ Right-click menu:
 | Multi-band Compressor | 3 or 4 bands with per-band threshold, ratio, and makeup gain. |
 | Auto Gain / Leveler | RMS or peak target level matching with smoothed gain. |
 | Loudness Normalizer (LUFS) | Integrated, short-term, or momentary LUFS normalization. |
+| Upward Compressor | Raises low-level material below a threshold. |
+| Parallel Compression Mix | Dry/compressed blend for parallel compression. |
 
 ## Equalizers & Filters Nodes
 
@@ -60,6 +62,8 @@ Right-click menu:
 | Dynamic EQ | Single-band threshold/ratio-controlled EQ for dynamic resonance cuts or boosts. |
 | Spectral Smoothing / Contrast | STFT spectral envelope smoothing or contrast enhancement. |
 | Hum Remover | Auto or fixed 50/60 Hz hum removal with harmonic notch filters. |
+| Linear Phase EQ | Zero-phase FFT EQ for linear-phase-style magnitude shaping. |
+| Comb Filter | Feedforward/feedback comb filtering. |
 
 ## Reverb Nodes
 
@@ -72,6 +76,7 @@ Right-click menu:
 | Plate Reverb Sim | Dense plate-style diffusion and smooth decay. |
 | Gated Reverb | Nonlinear gated tail cutoff for 1980s-style ambience. |
 | Reverse Reverb | Reverse audio, apply reverb, then reverse back for swelling effects. |
+| Shimmer Reverb | Reverb with octave-shifted shimmer in the tail. |
 
 ## Delay & Echo Nodes
 
@@ -84,6 +89,9 @@ Right-click menu:
 | Dub Delay | Tape/BBD-style delay with low-pass tone and wow/flutter. |
 | Filtered Delay | Delay with high-pass and low-pass filtering. |
 | Stereo Spread Delay | Small left/right delay offsets for stereo width. |
+| Reverse Delay | Reverse-style delayed repeats. |
+| Granular Delay | Delayed wet path broken into grains. |
+| Slap Echo | Slapback echo presets. |
 
 ## Modulation Nodes
 
@@ -99,6 +107,8 @@ Right-click menu:
 | Auto Panner | LFO-controlled stereo panning. |
 | Uni-vibe | Vintage optical phaser/chorus-style modulation. |
 | Vocoder | Filter-bank vocoder using a modulator envelope to shape a carrier. |
+| Barberpole Flanger | Continuously rising or falling flanger illusion. |
+| Auto-Filter | LFO-controlled filter sweep. |
 
 ## Distortion & Saturation Nodes
 
@@ -113,6 +123,8 @@ Right-click menu:
 | Overdrive / Distortion | Drive, tone, mode, output gain, and mix. |
 | Wavefolder | Wavefolding for complex harmonics. |
 | Exciter / Enhancer | Generates high-frequency harmonics for brightness. |
+| Fold & Clip | Hybrid wavefolding and clipping distortion. |
+| Amp Simulator | Simple amp and cabinet simulator. |
 
 ## Pitch & Time Nodes
 
@@ -125,6 +137,8 @@ Right-click menu:
 | Pitch Correction (Auto-Tune style) | Monophonic pitch correction to a selected key and scale. |
 | Varispeed Player | Varispeed playback with linked speed, pitch, and duration. |
 | Granular Processor | Windowed grains with pitch, jitter, scatter, and reverse probability. |
+| Formant Shifter | Spectral-envelope/formant shifting. |
+| Polyphonic Pitch Correction | Spectral pitch-class correction for chords and mixes. |
 
 ## Stereo Imaging Nodes
 
@@ -150,6 +164,8 @@ Right-click menu:
 | Ambisonics Rotator | Rotates WXYZ soundfields by yaw, pitch, and roll. |
 | Distance Simulator | Distance gain, air absorption, predelay, and reverb blend. |
 | Doppler Effect | Doppler pitch and delay from changing distance and velocity. |
+| VBAP Panner | Multi-speaker panning from speaker angles. |
+| Higher-Order Ambisonics Encoder | Approximate HOA channel encoder. |
 
 ## Metering & Analysis Nodes
 
@@ -167,6 +183,8 @@ Right-click menu:
 | Key / Pitch Detector | Dominant pitch and nearest pitch class. |
 | Transient / Onset Detector | Onset time list. |
 | Silence Detector | Silent range list below a threshold. |
+| True Peak Meter | Oversampled true-peak dBFS and overload flag. |
+| Dynamic Range DR Meter | Crest-factor-style DR estimate. |
 
 ## Signal Generators Nodes
 
@@ -178,6 +196,10 @@ Right-click menu:
 | Impulse | Single-sample impulse or short click. |
 | Oscillator (Multi-wave) | Sine, triangle, saw, or square oscillator with duty cycle. |
 | Click Track / Metronome | BPM, time signature, and bar count click track. |
+| FM Operator | Carrier/modulator FM tone generator. |
+| Karplus-Strong String | Plucked-string physical modeling. |
+| Wavetable Oscillator | Built-in wavetable oscillator. |
+| Sample Player | Loads, trims, loops, gains, and resamples WAV samples. |
 
 ## Routing & Mixing Nodes
 

@@ -8,6 +8,7 @@ import torch
 from .common import audio_waveform, ba_filter_waveform, butter_sos, clamp01, copy_audio, db_to_amp, meter_envelope, mix_audio, sos_filter_waveform
 
 WAVEFORMS = ["sine", "triangle", "square"]
+AUTO_FILTER_TYPES = ["low_pass", "high_pass", "band_pass"]
 
 
 def _to_numpy(waveform: torch.Tensor) -> np.ndarray:
@@ -210,3 +211,47 @@ def vocoder(
     wet = wet / torch.clamp(peak, min=1.0)
     wet = wet * float(db_to_amp(carrier_gain_db))
     return copy_audio(carrier, mix_audio(carrier_waveform, wet, mix))
+
+
+def barberpole_flanger(audio: dict, base_delay_ms: float, depth_ms: float, rate_hz: float, feedback: float, direction: str, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    wet = np.zeros_like(data, dtype=np.float32)
+    sign = -1.0 if direction == "down" else 1.0
+    length = data.shape[-1]
+    for b in range(data.shape[0]):
+        for c in range(data.shape[1]):
+            acc = np.zeros(length, dtype=np.float32)
+            for voice in range(4):
+                phase = (np.arange(length, dtype=np.float32) * float(rate_hz) / sample_rate + voice / 4.0) % 1.0
+                ramp = phase if sign > 0.0 else 1.0 - phase
+                delays = sample_rate * (float(base_delay_ms) + float(depth_ms) * ramp) / 1000.0
+                voice_out = _fractional_delay(data[b, c], delays)
+                fade = np.sin(np.pi * phase) ** 2
+                acc += voice_out * fade
+            wet[b, c] = acc * 0.5 + feedback * np.concatenate([np.zeros(1, dtype=np.float32), acc[:-1]])
+    return copy_audio(audio, mix_audio(waveform, _from_numpy(wet, waveform), mix))
+
+
+def auto_filter(audio: dict, filter_type: str, base_cutoff_hz: float, depth_octaves: float, rate_hz: float, resonance_q: float, waveform_shape: str, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    wet = np.zeros_like(data, dtype=np.float32)
+    lfo = 0.5 + 0.5 * _lfo(data.shape[-1], sample_rate, rate_hz, waveform_shape)
+    cutoff = float(base_cutoff_hz) * (2.0 ** ((lfo - 0.5) * 2.0 * float(depth_octaves)))
+    cutoff = np.clip(cutoff, 20.0, sample_rate * 0.45)
+    for b in range(data.shape[0]):
+        for c in range(data.shape[1]):
+            y = np.zeros(data.shape[-1], dtype=np.float32)
+            z = 0.0
+            for n in range(data.shape[-1]):
+                alpha = 1.0 - math.exp(-2.0 * math.pi * float(cutoff[n]) / sample_rate)
+                z = z + alpha * (float(data[b, c, n]) - z)
+                if filter_type == "high_pass":
+                    y[n] = data[b, c, n] - z
+                elif filter_type == "band_pass":
+                    y[n] = (data[b, c, n] - z) * min(max(float(resonance_q), 0.1), 10.0)
+                else:
+                    y[n] = z
+            wet[b, c] = np.tanh(y) if filter_type == "band_pass" else y
+    return copy_audio(audio, mix_audio(waveform, _from_numpy(wet, waveform), mix))

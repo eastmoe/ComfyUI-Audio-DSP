@@ -350,3 +350,35 @@ def loudness_normalizer(
     gain = expand_frames(gain_db, hop_size, length).view(batch, 1, length)
     normalized = waveform * db_to_amp(gain)
     return copy_audio(audio, _batch_peak_limit(normalized, true_peak_ceiling_db))
+
+
+def upward_compressor(audio: dict, threshold_db: float, ratio: float, attack_ms: float, release_ms: float, range_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    env = meter_envelope(flat, sample_rate, attack_ms, release_ms, mode="rms")
+    level_db = amp_to_db(env)
+    below = torch.clamp(float(threshold_db) - level_db, min=0.0)
+    gain_db = torch.clamp((1.0 - 1.0 / max(float(ratio), 1.0)) * below, max=abs(float(range_db)))
+    wet = flat * db_to_amp(gain_db)
+    return copy_audio(audio, restore_channels(mix_audio(flat, wet, mix), shape))
+
+
+def parallel_compression_mix(
+    audio: dict,
+    threshold_db: float,
+    ratio: float,
+    attack_ms: float,
+    release_ms: float,
+    knee_db: float,
+    compressed_gain_db: float,
+    dry_gain_db: float,
+    blend: float,
+) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    env = meter_envelope(flat, sample_rate, attack_ms, release_ms, mode="rms")
+    gain_db = _compressor_gain_db(env, threshold_db, ratio, knee_db) + float(compressed_gain_db)
+    compressed = flat * db_to_amp(gain_db)
+    dry = flat * float(db_to_amp(dry_gain_db))
+    wet = dry.lerp(compressed, max(0.0, min(float(blend), 1.0)))
+    return copy_audio(audio, restore_channels(wet, shape))

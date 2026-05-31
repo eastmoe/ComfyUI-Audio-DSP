@@ -11,6 +11,7 @@ from .common import audio_waveform, butter_sos, clamp01, copy_audio, db_to_amp, 
 from .reverb import schroeder_reverb
 
 SPATIAL_DECODER_MODES = ["stereo", "binaural"]
+HOA_ORDERS = ["1", "2", "3"]
 
 
 def _to_numpy(waveform: torch.Tensor) -> np.ndarray:
@@ -198,3 +199,61 @@ def doppler_effect(audio: dict, start_distance_m: float, end_distance_m: float, 
             wet[b, c] = np.interp(positions, grid, data[b, c], left=0.0, right=0.0).astype(np.float32) * dry_gain
     wet_tensor = _from_numpy(wet, waveform)
     return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))
+
+
+def vbap_panner(audio: dict, azimuth_deg: float, speaker_angles_deg: str, spread: float, normalize: bool) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    mono = _mono(waveform)
+    angles = []
+    for item in str(speaker_angles_deg).replace(";", ",").split(","):
+        item = item.strip()
+        if item:
+            angles.append(float(item))
+    if len(angles) < 2:
+        angles = [-30.0, 30.0]
+    target = ((float(azimuth_deg) + 180.0) % 360.0) - 180.0
+    speakers = [((angle + 180.0) % 360.0) - 180.0 for angle in angles]
+    order = np.argsort(speakers)
+    speakers_sorted = [speakers[i] for i in order]
+    gains_sorted = np.zeros(len(speakers_sorted), dtype=np.float32)
+    extended = speakers_sorted + [speakers_sorted[0] + 360.0]
+    target_ext = target
+    if target_ext < speakers_sorted[0]:
+        target_ext += 360.0
+    pair = 0
+    for index in range(len(speakers_sorted)):
+        if extended[index] <= target_ext <= extended[index + 1]:
+            pair = index
+            break
+    left_angle = extended[pair]
+    right_angle = extended[pair + 1]
+    frac = 0.0 if right_angle == left_angle else (target_ext - left_angle) / (right_angle - left_angle)
+    gains_sorted[pair % len(speakers_sorted)] = math.cos(frac * math.pi * 0.5)
+    gains_sorted[(pair + 1) % len(speakers_sorted)] = math.sin(frac * math.pi * 0.5)
+    if spread > 0.0:
+        for index, angle in enumerate(speakers_sorted):
+            dist = abs(((angle - target + 180.0) % 360.0) - 180.0)
+            gains_sorted[index] += max(0.0, 1.0 - dist / max(float(spread), 1.0)) * 0.5
+    if bool(normalize):
+        gains_sorted /= max(float(np.sqrt(np.sum(gains_sorted * gains_sorted))), 1.0e-6)
+    gains = np.zeros_like(gains_sorted)
+    for sorted_index, original_index in enumerate(order):
+        gains[original_index] = gains_sorted[sorted_index]
+    out = torch.cat([mono * float(gain) for gain in gains], dim=1)
+    return copy_audio(audio, out)
+
+
+def higher_order_ambisonics_encoder(audio: dict, order: str, azimuth_deg: float, elevation_deg: float, gain_db: float) -> dict:
+    waveform, _sample_rate = audio_waveform(audio)
+    mono = _mono(waveform) * float(db_to_amp(gain_db))
+    order_i = max(1, min(int(order), 3))
+    az = math.radians(float(azimuth_deg))
+    el = math.radians(float(elevation_deg))
+    channels = [mono / math.sqrt(2.0)]
+    for n in range(1, order_i + 1):
+        channels.append(mono * math.cos(n * az) * math.cos(el) ** n)
+        channels.append(mono * math.sin(n * az) * math.cos(el) ** n)
+        channels.append(mono * math.sin(el) ** n)
+        for _m in range(max(0, 2 * n - 2)):
+            channels.append(torch.zeros_like(mono))
+    return copy_audio(audio, torch.cat(channels[: (order_i + 1) ** 2], dim=1))

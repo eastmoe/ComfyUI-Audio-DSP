@@ -41,6 +41,8 @@
 | Multi-band Compressor | 多段压缩：支持 3 或 4 段，各段有独立阈值、比率和补偿增益。 |
 | Auto Gain / Leveler | 自动增益：按 RMS 或峰值匹配目标电平。 |
 | Loudness Normalizer (LUFS) | 响度标准化：支持整体、短时、瞬时 LUFS 归一化。 |
+| Upward Compressor | 向上压缩器：提升低于阈值的低电平内容。 |
+| Parallel Compression Mix | 并行压缩混合：干声与压缩通路混合。 |
 
 ## 均衡与滤波节点
 
@@ -60,6 +62,8 @@
 | Dynamic EQ | 动态 EQ：单频段阈值/比率控制，用于动态削共振或增强基频。 |
 | Spectral Smoothing / Contrast | 频谱抹平/对比增强：平滑或增强频谱包络。 |
 | Hum Remover | 去嗡嗡声：自动或固定 50/60 Hz 及谐波陷波。 |
+| Linear Phase EQ | 线性相位 EQ：零相位 FFT 幅度塑形。 |
+| Comb Filter | 梳状滤波器：前馈/反馈梳状滤波。 |
 
 ## 混响节点
 
@@ -72,6 +76,7 @@
 | Plate Reverb Sim | 板式混响模拟：密集扩散和平滑衰减。 |
 | Gated Reverb | 门控混响：非线性尾音截断，80 年代风格。 |
 | Reverse Reverb | 反向混响：反转音频、施加混响、再反转，制造膨胀效果。 |
+| Shimmer Reverb | Shimmer 混响：混响尾音中加入八度移调成分。 |
 
 ## 延迟与回声节点
 
@@ -84,6 +89,9 @@
 | Dub Delay | 磁带/BBD 风格 Dub 延迟：低通染色、反馈和哇音颤动。 |
 | Filtered Delay | 带滤波延迟：延迟信号带高通/低通滤波。 |
 | Stereo Spread Delay | 扩散延迟：左右声道微小时差制造立体声宽度。 |
+| Reverse Delay | 反向延迟：倒放式延迟重复。 |
+| Granular Delay | 粒子延迟：将延迟湿声拆成颗粒。 |
+| Slap Echo | Slap Echo：常用 slapback 回声预设。 |
 
 ## 调制效果节点
 
@@ -99,6 +107,8 @@
 | Auto Panner | 自动声像：LFO 调制左右声像位置。 |
 | Uni-vibe | 复古光耦合移相/合唱风格效果。 |
 | Vocoder | 声码器：用调制信号包络塑形载波滤波器组。 |
+| Barberpole Flanger | Barberpole 镶边：连续上升或下降的无限镶边错觉。 |
+| Auto-Filter | 自动滤波器：LFO 控制滤波器扫动。 |
 
 ## 失真与染色节点
 
@@ -113,6 +123,8 @@
 | Overdrive / Distortion | 过载/失真：增益、音色控制、混合。 |
 | Wavefolder | 波折器：折叠波形产生复杂谐波。 |
 | Exciter / Enhancer | 激励器：生成高频谐波增加亮度。 |
+| Fold & Clip | 折叠/削波混合：波折叠与削波混合失真。 |
+| Amp Simulator | 音箱模拟器：简单放大器和箱体滤波模拟。 |
 
 ## 音调与时间变换节点
 
@@ -125,6 +137,8 @@
 | Pitch Correction (Auto-Tune style) | 音高修正：将单声部音高拉向指定调性和音阶。 |
 | Varispeed Player | 变速播放：模拟设备变速，音高和时长一起改变。 |
 | Granular Processor | 颗粒处理器：窗口颗粒重放，支持音高、抖动、散布和反转概率。 |
+| Formant Shifter | 共振峰移位器：移动频谱包络。 |
+| Polyphonic Pitch Correction | 多声部音高校正：频谱音级约束。 |
 
 ## 立体声场控制节点
 
@@ -150,6 +164,8 @@
 | Ambisonics Rotator | 旋转 WXYZ Ambisonics 声场。 |
 | Distance Simulator | 距离衰减、空气吸收、预延迟和混响比例联动。 |
 | Doppler Effect | 根据距离变化和速度模拟多普勒音高/延迟变化。 |
+| VBAP Panner | VBAP 摆位：按扬声器角度输出多声道摆位。 |
+| Higher-Order Ambisonics Encoder | 高阶 Ambisonics：近似 HOA 多声道编码。 |
 
 ## 测量与分析节点
 
@@ -167,6 +183,8 @@
 | Key / Pitch Detector | 估算主频率和最近音名。 |
 | Transient / Onset Detector | 检测起始点时间列表。 |
 | Silence Detector | 检测低于阈值的静音段落。 |
+| True Peak Meter | 真峰值表：过采样峰值 dBFS 和过载状态。 |
+| Dynamic Range DR Meter | 动态范围 DR 表：基于峰值/RMS 的 DR 估算。 |
 
 ## 信号发生器节点
 
@@ -178,6 +196,10 @@
 | Impulse | 单采样脉冲或短点击音。 |
 | Oscillator (Multi-wave) | 正弦、三角、锯齿、方波，可调占空比。 |
 | Click Track / Metronome | 按 BPM、拍号和小节数生成节拍器。 |
+| FM Operator | FM 算子：载波/调制器 FM 音源。 |
+| Karplus-Strong String | Karplus-Strong 弦模拟：拨弦物理建模。 |
+| Wavetable Oscillator | 波表振荡器：内置波表音源。 |
+| Sample Player | 采样播放器：加载、裁剪、循环、增益和重采样 WAV。 |
 
 ## 路由与混音节点
 

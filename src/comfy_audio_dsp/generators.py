@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import math
+import os
 
 import numpy as np
 import torch
-from scipy import signal
+from scipy import io, signal
 
-from .common import copy_audio
+from .common import resample_np
 
 NOISE_TYPES = ["white", "pink", "brown"]
 SWEEP_MODES = ["linear", "logarithmic"]
 OSCILLATOR_WAVES = ["sine", "triangle", "saw", "square"]
+WAVETABLES = ["sine", "triangle", "saw", "square", "organ"]
 
 
 def _audio(waveform: torch.Tensor, sample_rate: int) -> dict:
@@ -92,3 +94,74 @@ def click_track_metronome(bpm: float, beats_per_bar: int, bars: int, sample_rate
         click = torch.sin(2.0 * math.pi * freq * t[: end - start]) * env[: end - start] * float(amplitude)
         wave[..., start:end] += click.view(1, 1, -1)
     return _audio(wave.repeat(1, 2, 1), sample_rate)
+
+
+def fm_operator(carrier_hz: float, modulator_hz: float, modulation_index: float, amplitude: float, duration_s: float, sample_rate: int, channels: int) -> dict:
+    t = _time(duration_s, sample_rate)
+    mod = torch.sin(2.0 * math.pi * float(modulator_hz) * t) * float(modulation_index)
+    wave = torch.sin(2.0 * math.pi * float(carrier_hz) * t + mod) * float(amplitude)
+    return _audio(wave.view(1, 1, -1).repeat(1, max(1, int(channels)), 1), sample_rate)
+
+
+def karplus_strong_string(frequency_hz: float, decay: float, brightness: float, duration_s: float, sample_rate: int, seed: int) -> dict:
+    rng = np.random.default_rng(int(seed))
+    length = max(1, int(round(float(duration_s) * int(sample_rate))))
+    delay = max(2, int(round(sample_rate / max(float(frequency_hz), 1.0))))
+    buffer = rng.uniform(-1.0, 1.0, delay).astype(np.float32) * float(brightness)
+    out = np.zeros(length, dtype=np.float32)
+    decay = max(0.0, min(float(decay), 0.9999))
+    for n in range(length):
+        current = buffer[n % delay]
+        next_value = decay * 0.5 * (buffer[n % delay] + buffer[(n + 1) % delay])
+        buffer[n % delay] = next_value
+        out[n] = current
+    return _audio(torch.from_numpy(out).view(1, 1, -1).repeat(1, 2, 1), sample_rate)
+
+
+def wavetable_oscillator(wavetable: str, frequency_hz: float, amplitude: float, duration_s: float, sample_rate: int, table_size: int, channels: int) -> dict:
+    table_size = max(16, int(table_size))
+    phase_table = np.arange(table_size, dtype=np.float32) / table_size
+    if wavetable == "triangle":
+        table = 4.0 * np.abs(phase_table - 0.5) - 1.0
+    elif wavetable == "saw":
+        table = 2.0 * phase_table - 1.0
+    elif wavetable == "square":
+        table = np.where(phase_table < 0.5, 1.0, -1.0)
+    elif wavetable == "organ":
+        table = np.sin(2.0 * np.pi * phase_table) + 0.35 * np.sin(4.0 * np.pi * phase_table) + 0.18 * np.sin(6.0 * np.pi * phase_table)
+        table = table / max(float(np.max(np.abs(table))), 1.0e-6)
+    else:
+        table = np.sin(2.0 * np.pi * phase_table)
+    length = max(1, int(round(float(duration_s) * int(sample_rate))))
+    phase = (np.arange(length, dtype=np.float32) * float(frequency_hz) / sample_rate * table_size) % table_size
+    wave = np.interp(phase, np.arange(table_size), table, period=table_size).astype(np.float32) * float(amplitude)
+    return _audio(torch.from_numpy(wave).view(1, 1, -1).repeat(1, max(1, int(channels)), 1), sample_rate)
+
+
+def sample_player(path: str, target_sample_rate: int, start_s: float, duration_s: float, gain_db: float, loop: bool) -> dict:
+    from .common import db_to_amp
+
+    if not path or not os.path.exists(path):
+        raise FileNotFoundError(f"Comfy-Audio-DSP: sample file not found: {path}")
+    sample_rate, data = io.wavfile.read(path)
+    if data.dtype.kind in {"i", "u"}:
+        data = data.astype(np.float32) / max(float(np.iinfo(data.dtype).max), 1.0)
+    else:
+        data = data.astype(np.float32)
+    if data.ndim == 1:
+        data = data[None, :]
+    else:
+        data = data.T
+    target_sample_rate = int(target_sample_rate) if int(target_sample_rate) > 0 else int(sample_rate)
+    data = resample_np(data, int(sample_rate), target_sample_rate)
+    start = max(0, int(round(float(start_s) * target_sample_rate)))
+    data = data[:, start:]
+    if duration_s > 0.0:
+        target = max(1, int(round(float(duration_s) * target_sample_rate)))
+        if bool(loop) and data.shape[-1] > 0:
+            repeats = int(math.ceil(target / data.shape[-1]))
+            data = np.tile(data, (1, repeats))[:, :target]
+        else:
+            data = np.pad(data[:, :target], ((0, 0), (0, max(0, target - data.shape[-1]))))
+    data = data[None, :, :] * float(db_to_amp(gain_db))
+    return _audio(torch.from_numpy(data.astype(np.float32)), target_sample_rate)

@@ -213,3 +213,14 @@ def reverse_reverb(audio: dict, reverb_time_s: float, diffusion: float, mix: flo
     wet = _apply_channelwise(reversed_audio, lambda x: _schroeder_np(x, sample_rate, reverb_time_s, diffusion, 0.12))
     wet = torch.flip(wet, dims=(-1,))
     return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def shimmer_reverb(audio: dict, reverb_time_s: float, diffusion: float, shimmer_octaves: float, shimmer_amount: float, high_cut_hz: float, mix: float) -> dict:
+    from .pitch_time import pitch_shifter
+
+    waveform, sample_rate = audio_waveform(audio)
+    base = schroeder_reverb(audio, 20.0, reverb_time_s, diffusion, 80.0, high_cut_hz, 1.0)["waveform"]
+    shifted = pitch_shifter({"waveform": base, "sample_rate": sample_rate}, 12.0 * float(shimmer_octaves), 0.0, 1.0)["waveform"]
+    wet = base + shifted * max(0.0, min(float(shimmer_amount), 2.0))
+    wet = sos_filter_waveform(wet, butter_sos(sample_rate, "lowpass", high_cut_hz, order=2), zero_phase=False)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))

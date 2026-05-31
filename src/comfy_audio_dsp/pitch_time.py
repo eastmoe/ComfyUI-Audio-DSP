@@ -6,10 +6,11 @@ import numpy as np
 import torch
 from scipy import signal
 
-from .common import AUDIO_EPS, audio_waveform, clamp01, copy_audio, db_to_amp, mix_audio
+from .common import AUDIO_EPS, audio_waveform, clamp01, copy_audio, db_to_amp, flatten_channels, mix_audio, restore_channels
 
 PITCH_KEYS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 PITCH_SCALES = ["chromatic", "major", "minor", "major_pentatonic", "minor_pentatonic"]
+FORMANT_MODES = ["up", "down"]
 SCALE_INTERVALS = {
     "chromatic": tuple(range(12)),
     "major": (0, 2, 4, 5, 7, 9, 11),
@@ -268,3 +269,46 @@ def granular_processor(
     wet = wet / np.maximum(weight, 1.0e-5)
     wet_tensor = _from_numpy(wet, waveform)
     return copy_audio(audio, mix_audio(waveform, wet_tensor, mix))
+
+
+def formant_shifter(audio: dict, shift_ratio: float, fft_size: int, hop_size: int, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    flat, shape = flatten_channels(waveform)
+    data = flat.detach().cpu().numpy().astype(np.float32, copy=False)
+    fft_size = max(128, int(fft_size))
+    hop_size = max(1, int(hop_size))
+    ratio = max(0.25, min(float(shift_ratio), 4.0))
+    out = np.zeros_like(data, dtype=np.float32)
+    for row in range(data.shape[0]):
+        _, _, stft = signal.stft(data[row], fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), boundary="zeros", padded=True)
+        mag = np.abs(stft)
+        phase = np.exp(1j * np.angle(stft))
+        bins = np.arange(mag.shape[0], dtype=np.float32)
+        warped = np.empty_like(mag)
+        for frame in range(mag.shape[1]):
+            warped[:, frame] = np.interp(bins / ratio, bins, mag[:, frame], left=mag[0, frame], right=0.0)
+        _, y = signal.istft(warped * phase, fs=sample_rate, nperseg=fft_size, noverlap=max(0, fft_size - hop_size), input_onesided=True)
+        if y.shape[-1] < data.shape[-1]:
+            y = np.pad(y, (0, data.shape[-1] - y.shape[-1]))
+        out[row] = y[: data.shape[-1]]
+    wet = restore_channels(torch.from_numpy(out).to(device=waveform.device, dtype=waveform.dtype), shape)
+    return copy_audio(audio, mix_audio(waveform, wet, mix))
+
+
+def polyphonic_pitch_correction(audio: dict, key: str, scale: str, correction_amount: float, attenuation_db: float, mix: float) -> dict:
+    waveform, sample_rate = audio_waveform(audio)
+    data = _to_numpy(waveform)
+    freqs = np.fft.rfftfreq(data.shape[-1], d=1.0 / sample_rate)
+    key_offset = PITCH_KEYS.index(key) if key in PITCH_KEYS else 0
+    intervals = SCALE_INTERVALS.get(scale, SCALE_INTERVALS["chromatic"])
+    response = np.ones_like(freqs, dtype=np.float32)
+    for index, freq in enumerate(freqs):
+        if freq < 20.0:
+            continue
+        midi = 69.0 + 12.0 * math.log2(freq / 440.0)
+        chroma = (round(midi) - key_offset) % 12
+        if chroma not in intervals:
+            distance = min(abs(chroma - interval) % 12 for interval in intervals)
+            response[index] = float(db_to_amp(-abs(float(attenuation_db)) * max(0.0, min(float(correction_amount), 1.0)) / max(distance, 1)))
+    wet_np = np.fft.irfft(np.fft.rfft(data, axis=-1) * response[None, None, :], n=data.shape[-1], axis=-1).astype(np.float32)
+    return copy_audio(audio, mix_audio(waveform, _from_numpy(wet_np, waveform), mix))
