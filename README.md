@@ -292,6 +292,15 @@ Right-click menu:
 | Audio Feature to Text | BPM, key, loudness, and timbre metadata as prompt text. |
 | Beat Slicer | Transient-based slice ranges for workflow scheduling. |
 | Audio Quality Estimator | No-reference or optional-reference quality score and details. |
+| Song Analysis to DSP Controls | Parses ComfyUI-Song-Analyst `analysis_json` into BPM, key, beat, downbeat, and segment outputs. |
+| Song Key to Pitch Controls | Converts Song-Analyst key text such as `C major` into pitch-correction controls. |
+| Song Segment Selector | Crops an `AUDIO` clip from Song-Analyst `SA_SEGMENTS` or segment JSON. |
+| Song Beat Grid Slicer | Builds slice ranges from Song-Analyst `beat_times` and optional `downbeats`. |
+
+Tempo-synced Delay, Click Track / Metronome, Rhythmic Gate / Stutter Sequencer,
+Step Sequencer, Pitch Correction, and Polyphonic Pitch Correction also expose
+optional Song-Analyst inputs. These are soft-compatible type names only; this
+plugin does not import or require ComfyUI-Song-Analyst.
 
 ## Repository Layout
 

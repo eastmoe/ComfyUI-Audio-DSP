@@ -196,7 +196,11 @@
     "ComfyAudioDSPDenoiser": "宽带降噪 / Denoiser",
     "ComfyAudioDSPAudioFeatureToText": "音频特征转文本",
     "ComfyAudioDSPBeatSlicer": "节拍切片器",
-    "ComfyAudioDSPAudioQualityEstimator": "音频质量估算器"
+    "ComfyAudioDSPAudioQualityEstimator": "音频质量估算器",
+    "ComfyAudioDSPSongAnalysisToDSPControls": "Song 分析转 DSP 控制",
+    "ComfyAudioDSPSongKeyToPitchControls": "Song 调性转音高校正控制",
+    "ComfyAudioDSPSongSegmentSelector": "Song 段落选择器",
+    "ComfyAudioDSPSongBeatGridSlicer": "Song 节拍网格切片器"
   },
   "descriptions": {
     "ComfyAudioDSPCompressor": "使用阈值、比率、启动、释放、膝宽、补偿增益、检测方式与干湿混合控制动态范围。",
@@ -374,7 +378,11 @@
     "ComfyAudioDSPDenoiser": "针对连续背景噪声执行频谱减法或维纳式宽带降噪。",
     "ComfyAudioDSPAudioFeatureToText": "提取 BPM、调性、响度和音色特征并输出提示词友好的文本。",
     "ComfyAudioDSPBeatSlicer": "按瞬态起始点生成音频切片时间段，便于工作流调度。",
-    "ComfyAudioDSPAudioQualityEstimator": "估算音频质量分数，支持无参考启发式和可选参考信号。"
+    "ComfyAudioDSPAudioQualityEstimator": "估算音频质量分数，支持无参考启发式和可选参考信号。",
+    "ComfyAudioDSPSongAnalysisToDSPControls": "解析 ComfyUI-Song-Analyst 的 analysis_json，输出 BPM、调性、节拍和段落等可复用 DSP 控制信号。",
+    "ComfyAudioDSPSongKeyToPitchControls": "将 Song-Analyst 的调性文本转换为 Audio-DSP 音高校正可用的主音和音阶。",
+    "ComfyAudioDSPSongSegmentSelector": "接收 Song-Analyst 的结构段落或相似片段列表，并裁剪出选中的音频片段。",
+    "ComfyAudioDSPSongBeatGridSlicer": "使用 Song-Analyst 的节拍时间和强拍标记生成按拍或按小节的切片范围。"
   },
   "return_names": {
     "ComfyAudioDSPCompressor": ["音频"],
@@ -552,7 +560,11 @@
     "ComfyAudioDSPDenoiser": ["音频"],
     "ComfyAudioDSPAudioFeatureToText": ["音频", "文本"],
     "ComfyAudioDSPBeatSlicer": ["音频", "切片", "切片数"],
-    "ComfyAudioDSPAudioQualityEstimator": ["音频", "分数", "明细"]
+    "ComfyAudioDSPAudioQualityEstimator": ["音频", "分数", "明细"],
+    "ComfyAudioDSPSongAnalysisToDSPControls": ["BPM", "调性文本", "主音", "音阶", "节拍时间", "强拍标记", "段落", "明细"],
+    "ComfyAudioDSPSongKeyToPitchControls": ["主音", "音阶", "明细"],
+    "ComfyAudioDSPSongSegmentSelector": ["音频", "开始 s", "结束 s", "明细"],
+    "ComfyAudioDSPSongBeatGridSlicer": ["音频", "切片", "切片数"]
   },
   "ui": {
     "common": {
@@ -603,6 +615,8 @@
       "feedback": {"display_name": "反馈量", "tooltip": "回声反馈比例，负值会反相反馈。"},
       "width": {"display_name": "立体声宽度", "tooltip": "湿声的立体声扩展程度。"},
       "bpm": {"display_name": "BPM", "tooltip": "用于节拍同步的速度。"},
+      "song_bpm": {"display_name": "Song BPM", "tooltip": "可选连接 Song-Analyst 的 BPM 输出；连接后覆盖本节点 BPM。"},
+      "analysis_json": {"display_name": "分析 JSON", "tooltip": "可选连接 Song-Analyst 的 analysis_json 输出，用于提取 BPM、调性、节拍或段落。"},
       "note_value": {"display_name": "音符时值", "tooltip": "延迟同步到的音符长度。"},
       "base_delay_ms": {"display_name": "基础延迟 ms", "tooltip": "左右声道偏移前的基础延迟时间。"},
       "spread_ms": {"display_name": "扩散偏移 ms", "tooltip": "左右声道之间的延迟差。"},
@@ -636,6 +650,7 @@
       "speed_ratio": {"display_name": "速度比例", "tooltip": "播放/重采样速度比例，大于 1 更快且更高。"},
       "dry_gain": {"display_name": "干声增益", "tooltip": "原始声音在和声混合中的比例。"},
       "key": {"display_name": "调性", "tooltip": "音高修正使用的主音。"},
+      "song_key": {"display_name": "Song 调性", "tooltip": "可选连接 Song-Analyst 的调性文本，例如 C major 或 A minor。"},
       "scale": {"display_name": "音阶", "tooltip": "音高修正映射到的音阶。"},
       "correction_speed": {"display_name": "修正速度", "tooltip": "音高拉向目标音的速度。"},
       "pan": {"display_name": "声像", "tooltip": "-1 为左，0 为中间，1 为右。"},
@@ -997,6 +1012,28 @@
       "side_frequency_hz": {"display_name": "Side 频率 Hz", "tooltip": "Side 滤波中心或截止频率。"},
       "side_gain_db": {"display_name": "Side 增益 dB", "tooltip": "Side 均衡增益。"},
       "side_q": {"display_name": "Side Q 值", "tooltip": "Side 滤波带宽/共振。"}
+    },
+    "song_analysis_to_dsp_controls": {
+      "analysis_json": {"display_name": "分析 JSON", "tooltip": "连接 Song-Analyst 各分析节点输出的 analysis_json。"}
+    },
+    "song_key_to_pitch_controls": {
+      "key_text": {"display_name": "调性文本", "tooltip": "Song-Analyst 输出的调性文本，例如 C major、A minor、Bb major。"},
+      "analysis_json": {"display_name": "分析 JSON", "tooltip": "可选连接 KeyDetector 的 analysis_json；为空时使用调性文本。"}
+    },
+    "song_segment_selector": {
+      "segment_index": {"display_name": "段落索引", "tooltip": "选择第几个结构段落或相似片段。"},
+      "label_filter": {"display_name": "标签筛选", "tooltip": "可选按段落标签筛选，例如 chorus、verse 或 A。"},
+      "padding_s": {"display_name": "边缘保留 s", "tooltip": "裁剪时在段落前后额外保留的秒数。"},
+      "song_segments": {"display_name": "Song 段落", "tooltip": "连接 Song-Analyst 的 SA_SEGMENTS 输出。"},
+      "analysis_json": {"display_name": "分析 JSON", "tooltip": "可选连接 StructureSegmenter 或 MusicSimilarity 的 analysis_json。"}
+    },
+    "song_beat_grid_slicer": {
+      "beats_per_slice": {"display_name": "每切片拍数", "tooltip": "每个切片跨越的节拍数，4 通常表示一小节。"},
+      "padding_ms": {"display_name": "边缘保留 ms", "tooltip": "每个切片前后额外保留的毫秒数。"},
+      "prefer_downbeats": {"display_name": "优先强拍", "tooltip": "有强拍标记时优先从强拍开始切片。"},
+      "beat_times": {"display_name": "节拍时间", "tooltip": "连接 Song-Analyst 的 SA_FLOAT_LIST beat_times 输出。"},
+      "downbeats": {"display_name": "强拍标记", "tooltip": "连接 Song-Analyst 的 SA_INT_LIST downbeats 输出。"},
+      "analysis_json": {"display_name": "分析 JSON", "tooltip": "可选连接 BPMBeatTracker 的 analysis_json。"}
     },
     "audio_mixer": {
       "track_1_gain_db": {"display_name": "轨道 1 增益 dB", "tooltip": "第 1 路输入增益。"},

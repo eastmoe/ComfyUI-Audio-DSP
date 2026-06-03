@@ -74,13 +74,22 @@ def _combo(section: str, name: str, options: list[str], default: str) -> tuple:
     return (options, cfg)
 
 
+def _force_input(section: str, name: str, type_name: str) -> tuple:
+    cfg = {"forceInput": True}
+    cfg.update(_ui(section, name, name))
+    return (type_name, cfg)
+
+
 class _AudioDSPNode:
     RETURN_TYPES = ("AUDIO",)
     FUNCTION = "process"
 
     @classmethod
-    def _finish(cls, inputs: dict, section: str) -> dict:
-        return {"required": {"audio": _audio_input(section), **inputs}}
+    def _finish(cls, inputs: dict, section: str, optional: dict | None = None) -> dict:
+        config = {"required": {"audio": _audio_input(section), **inputs}}
+        if optional:
+            config["optional"] = optional
+        return config
 
 
 class ComfyAudioDSPCompressor(_AudioDSPNode):
@@ -740,9 +749,13 @@ class ComfyAudioDSPTempoSyncedDelay(_AudioDSPNode):
             "note_value": _combo(section, "note_value", list(NOTE_VALUES.keys()), "1/4"),
             "feedback": _float(section, "feedback", 0.35, -0.95, 0.95, 0.01),
             "mix": _float(section, "mix", 0.25, 0.0, 1.0, 0.01),
-        }, section)
+        }, section, {
+            "song_bpm": _force_input(section, "song_bpm", "FLOAT"),
+            "analysis_json": _force_input(section, "analysis_json", "STRING"),
+        })
 
-    def process(self, audio, bpm, note_value, feedback, mix):
+    def process(self, audio, bpm, note_value, feedback, mix, song_bpm=None, analysis_json=None):
+        bpm = dsp.song_bpm_value(bpm, song_bpm, analysis_json)
         return (dsp.tempo_synced_delay(audio, bpm, note_value, feedback, mix),)
 
 
@@ -1283,9 +1296,14 @@ class ComfyAudioDSPPitchCorrection(_AudioDSPNode):
             "scale": _combo(section, "scale", PITCH_SCALES, "major"),
             "correction_speed": _float(section, "correction_speed", 0.75, 0.0, 1.0, 0.01),
             "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01),
-        }, section)
+        }, section, {
+            "song_key": _force_input(section, "song_key", "STRING"),
+            "analysis_json": _force_input(section, "analysis_json", "STRING"),
+        })
 
-    def process(self, audio, key, scale, correction_speed, mix):
+    def process(self, audio, key, scale, correction_speed, mix, song_key=None, analysis_json=None):
+        if song_key not in (None, "") or analysis_json not in (None, ""):
+            key, scale, _details = dsp.song_key_to_pitch_controls(song_key or "", analysis_json)
         return (dsp.pitch_correction(audio, key, scale, correction_speed, mix),)
 
 
@@ -1860,9 +1878,10 @@ class ComfyAudioDSPClickTrackMetronome:
     @classmethod
     def INPUT_TYPES(cls):
         section = "click_track_metronome"
-        return {"required": {"bpm": _float(section, "bpm", 120.0, 20.0, 320.0, 0.1), "beats_per_bar": _int(section, "beats_per_bar", 4, 1, 16), "bars": _int(section, "bars", 4, 1, 1024), "sample_rate": _int(section, "sample_rate", 44100, 8000, 384000, 1), "accent_frequency_hz": _float(section, "accent_frequency_hz", 1600.0, 20.0, 20000.0, 1.0), "beat_frequency_hz": _float(section, "beat_frequency_hz", 1000.0, 20.0, 20000.0, 1.0), "amplitude": _float(section, "amplitude", 0.5, 0.0, 1.0, 0.01)}}
+        return {"required": {"bpm": _float(section, "bpm", 120.0, 20.0, 320.0, 0.1), "beats_per_bar": _int(section, "beats_per_bar", 4, 1, 16), "bars": _int(section, "bars", 4, 1, 1024), "sample_rate": _int(section, "sample_rate", 44100, 8000, 384000, 1), "accent_frequency_hz": _float(section, "accent_frequency_hz", 1600.0, 20.0, 20000.0, 1.0), "beat_frequency_hz": _float(section, "beat_frequency_hz", 1000.0, 20.0, 20000.0, 1.0), "amplitude": _float(section, "amplitude", 0.5, 0.0, 1.0, 0.01)}, "optional": {"song_bpm": _force_input(section, "song_bpm", "FLOAT"), "analysis_json": _force_input(section, "analysis_json", "STRING")}}
 
-    def process(self, bpm, beats_per_bar, bars, sample_rate, accent_frequency_hz, beat_frequency_hz, amplitude):
+    def process(self, bpm, beats_per_bar, bars, sample_rate, accent_frequency_hz, beat_frequency_hz, amplitude, song_bpm=None, analysis_json=None):
+        bpm = dsp.song_bpm_value(bpm, song_bpm, analysis_json)
         return (dsp.click_track_metronome(bpm, beats_per_bar, bars, sample_rate, accent_frequency_hz, beat_frequency_hz, amplitude),)
 
 
@@ -2591,9 +2610,10 @@ class ComfyAudioDSPRhythmicGateStutter(_AudioDSPNode):
     @classmethod
     def INPUT_TYPES(cls):
         section = "rhythmic_gate_stutter"
-        return cls._finish({"bpm": _float(section, "bpm", 120.0, 1.0, 400.0, 0.1), "division": _combo(section, "division", STUTTER_DIVISIONS, "1/16"), "pattern": _string(section, "pattern", "1,0,1,0,1,1,0,0"), "depth": _float(section, "depth", 1.0, 0.0, 1.0, 0.01), "smoothing_ms": _float(section, "smoothing_ms", 2.0, 0.0, 200.0, 0.1), "mode": _combo(section, "mode", ["gate", "stutter"], "gate"), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+        return cls._finish({"bpm": _float(section, "bpm", 120.0, 1.0, 400.0, 0.1), "division": _combo(section, "division", STUTTER_DIVISIONS, "1/16"), "pattern": _string(section, "pattern", "1,0,1,0,1,1,0,0"), "depth": _float(section, "depth", 1.0, 0.0, 1.0, 0.01), "smoothing_ms": _float(section, "smoothing_ms", 2.0, 0.0, 200.0, 0.1), "mode": _combo(section, "mode", ["gate", "stutter"], "gate"), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section, {"song_bpm": _force_input(section, "song_bpm", "FLOAT"), "analysis_json": _force_input(section, "analysis_json", "STRING")})
 
-    def process(self, audio, bpm, division, pattern, depth, smoothing_ms, mode, mix):
+    def process(self, audio, bpm, division, pattern, depth, smoothing_ms, mode, mix, song_bpm=None, analysis_json=None):
+        bpm = dsp.song_bpm_value(bpm, song_bpm, analysis_json)
         return (dsp.rhythmic_gate_stutter(audio, bpm, division, pattern, depth, smoothing_ms, mode, mix),)
 
 
@@ -2675,9 +2695,11 @@ class ComfyAudioDSPPolyphonicPitchCorrection(_AudioDSPNode):
     @classmethod
     def INPUT_TYPES(cls):
         section = "polyphonic_pitch_correction"
-        return cls._finish({"key": _combo(section, "key", PITCH_KEYS, "C"), "scale": _combo(section, "scale", PITCH_SCALES, "major"), "correction_amount": _float(section, "correction_amount", 0.5, 0.0, 1.0, 0.01), "attenuation_db": _float(section, "attenuation_db", 12.0, 0.0, 60.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section)
+        return cls._finish({"key": _combo(section, "key", PITCH_KEYS, "C"), "scale": _combo(section, "scale", PITCH_SCALES, "major"), "correction_amount": _float(section, "correction_amount", 0.5, 0.0, 1.0, 0.01), "attenuation_db": _float(section, "attenuation_db", 12.0, 0.0, 60.0, 0.1), "mix": _float(section, "mix", 1.0, 0.0, 1.0, 0.01)}, section, {"song_key": _force_input(section, "song_key", "STRING"), "analysis_json": _force_input(section, "analysis_json", "STRING")})
 
-    def process(self, audio, key, scale, correction_amount, attenuation_db, mix):
+    def process(self, audio, key, scale, correction_amount, attenuation_db, mix, song_key=None, analysis_json=None):
+        if song_key not in (None, "") or analysis_json not in (None, ""):
+            key, scale, _details = dsp.song_key_to_pitch_controls(song_key or "", analysis_json)
         return (dsp.polyphonic_pitch_correction(audio, key, scale, correction_amount, attenuation_db, mix),)
 
 
@@ -2985,9 +3007,10 @@ class ComfyAudioDSPStepSequencer:
     @classmethod
     def INPUT_TYPES(cls):
         section = "step_sequencer"
-        return {"required": {"sequence": _string(section, "sequence", "0, 0.5, 1, 0.5", multiline=True), "bpm": _float(section, "bpm", 120.0, 1.0, 400.0, 0.1), "step_value": _combo(section, "step_value", ["1/1", "1/2", "1/4", "1/8", "1/16"], "1/16"), "glide": _float(section, "glide", 0.0, 0.0, 1.0, 0.01), "duration_s": _float(section, "duration_s", 5.0, 0.001, 36000.0, 0.001), "sample_rate": _int(section, "sample_rate", 44100, 1000, 384000, 1), "points": _int(section, "points", 128, 4, 4096, 1)}}
+        return {"required": {"sequence": _string(section, "sequence", "0, 0.5, 1, 0.5", multiline=True), "bpm": _float(section, "bpm", 120.0, 1.0, 400.0, 0.1), "step_value": _combo(section, "step_value", ["1/1", "1/2", "1/4", "1/8", "1/16"], "1/16"), "glide": _float(section, "glide", 0.0, 0.0, 1.0, 0.01), "duration_s": _float(section, "duration_s", 5.0, 0.001, 36000.0, 0.001), "sample_rate": _int(section, "sample_rate", 44100, 1000, 384000, 1), "points": _int(section, "points", 128, 4, 4096, 1)}, "optional": {"song_bpm": _force_input(section, "song_bpm", "FLOAT"), "analysis_json": _force_input(section, "analysis_json", "STRING")}}
 
-    def process(self, sequence, bpm, step_value, glide, duration_s, sample_rate, points):
+    def process(self, sequence, bpm, step_value, glide, duration_s, sample_rate, points, song_bpm=None, analysis_json=None):
+        bpm = dsp.song_bpm_value(bpm, song_bpm, analysis_json)
         return dsp.step_sequencer(sequence, bpm, step_value, glide, duration_s, sample_rate, points)
 
 
@@ -3090,6 +3113,83 @@ class ComfyAudioDSPAudioQualityEstimator(_AudioDSPNode):
 
     def process(self, audio, quality_mode, reference_audio=None):
         return dsp.audio_quality_estimator(audio, quality_mode, reference_audio)
+
+
+class ComfyAudioDSPSongAnalysisToDSPControls:
+    CATEGORY = CATEGORY_WORKFLOW
+    RETURN_TYPES = ("FLOAT", "STRING", "STRING", "STRING", "SA_FLOAT_LIST", "SA_INT_LIST", "SA_SEGMENTS", "STRING")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSongAnalysisToDSPControls", ("bpm", "key_text", "key", "scale", "beat_times", "downbeats", "segments", "details"))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPSongAnalysisToDSPControls", "Parses Song-Analyst analysis_json into reusable DSP control outputs.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "song_analysis_to_dsp_controls"
+        return {"required": {"analysis_json": _force_input(section, "analysis_json", "STRING")}}
+
+    def process(self, analysis_json):
+        return dsp.analysis_to_dsp_controls(analysis_json)
+
+
+class ComfyAudioDSPSongKeyToPitchControls:
+    CATEGORY = CATEGORY_WORKFLOW
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSongKeyToPitchControls", ("key", "scale", "details"))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPSongKeyToPitchControls", "Converts Song-Analyst key text into Audio-DSP pitch correction controls.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "song_key_to_pitch_controls"
+        return {"required": {"key_text": _string(section, "key_text", "C major")}, "optional": {"analysis_json": _force_input(section, "analysis_json", "STRING")}}
+
+    def process(self, key_text, analysis_json=None):
+        return dsp.song_key_to_pitch_controls(key_text, analysis_json)
+
+
+class ComfyAudioDSPSongSegmentSelector(_AudioDSPNode):
+    CATEGORY = CATEGORY_WORKFLOW
+    RETURN_TYPES = ("AUDIO", "FLOAT", "FLOAT", "STRING")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSongSegmentSelector", ("audio", "start_s", "end_s", "details"))
+    DESCRIPTION = loc.description("ComfyAudioDSPSongSegmentSelector", "Selects and crops a Song-Analyst structure or similarity segment.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "song_segment_selector"
+        return cls._finish({
+            "segment_index": _int(section, "segment_index", 0, 0, 9999),
+            "label_filter": _string(section, "label_filter", ""),
+            "padding_s": _float(section, "padding_s", 0.0, 0.0, 3600.0, 0.001),
+        }, section, {
+            "song_segments": _force_input(section, "song_segments", "SA_SEGMENTS"),
+            "analysis_json": _force_input(section, "analysis_json", "STRING"),
+        })
+
+    def process(self, audio, segment_index, label_filter, padding_s, song_segments=None, analysis_json=None):
+        return dsp.song_segment_selector(audio, segment_index, label_filter, padding_s, song_segments, analysis_json)
+
+
+class ComfyAudioDSPSongBeatGridSlicer(_AudioDSPNode):
+    CATEGORY = CATEGORY_WORKFLOW
+    RETURN_TYPES = ("AUDIO", "STRING", "INT")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPSongBeatGridSlicer", ("audio", "slices", "slice_count"))
+    DESCRIPTION = loc.description("ComfyAudioDSPSongBeatGridSlicer", "Builds slice ranges from Song-Analyst beat times and optional downbeat flags.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "song_beat_grid_slicer"
+        return cls._finish({
+            "beats_per_slice": _int(section, "beats_per_slice", 4, 1, 64),
+            "padding_ms": _float(section, "padding_ms", 0.0, 0.0, 60000.0, 0.1),
+            "prefer_downbeats": _bool(section, "prefer_downbeats", True),
+        }, section, {
+            "beat_times": _force_input(section, "beat_times", "SA_FLOAT_LIST"),
+            "downbeats": _force_input(section, "downbeats", "SA_INT_LIST"),
+            "analysis_json": _force_input(section, "analysis_json", "STRING"),
+        })
+
+    def process(self, audio, beats_per_slice, padding_ms, prefer_downbeats, beat_times=None, downbeats=None, analysis_json=None):
+        return dsp.song_beat_grid_slicer(audio, beats_per_slice, padding_ms, prefer_downbeats, beat_times, downbeats, analysis_json)
 
 
 NODE_CLASS_MAPPINGS = {
@@ -3269,6 +3369,10 @@ NODE_CLASS_MAPPINGS = {
     "ComfyAudioDSPAudioFeatureToText": ComfyAudioDSPAudioFeatureToText,
     "ComfyAudioDSPBeatSlicer": ComfyAudioDSPBeatSlicer,
     "ComfyAudioDSPAudioQualityEstimator": ComfyAudioDSPAudioQualityEstimator,
+    "ComfyAudioDSPSongAnalysisToDSPControls": ComfyAudioDSPSongAnalysisToDSPControls,
+    "ComfyAudioDSPSongKeyToPitchControls": ComfyAudioDSPSongKeyToPitchControls,
+    "ComfyAudioDSPSongSegmentSelector": ComfyAudioDSPSongSegmentSelector,
+    "ComfyAudioDSPSongBeatGridSlicer": ComfyAudioDSPSongBeatGridSlicer,
 }
 
 _DISPLAY_FALLBACKS = {
@@ -3448,6 +3552,10 @@ _DISPLAY_FALLBACKS = {
     "ComfyAudioDSPAudioFeatureToText": "Audio Feature to Text",
     "ComfyAudioDSPBeatSlicer": "Beat Slicer",
     "ComfyAudioDSPAudioQualityEstimator": "Audio Quality Estimator",
+    "ComfyAudioDSPSongAnalysisToDSPControls": "Song Analysis to DSP Controls",
+    "ComfyAudioDSPSongKeyToPitchControls": "Song Key to Pitch Controls",
+    "ComfyAudioDSPSongSegmentSelector": "Song Segment Selector",
+    "ComfyAudioDSPSongBeatGridSlicer": "Song Beat Grid Slicer",
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {key: loc.display_name(key, value) for key, value in _DISPLAY_FALLBACKS.items()}

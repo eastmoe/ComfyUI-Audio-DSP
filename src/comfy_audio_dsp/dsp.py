@@ -12,6 +12,7 @@ from .reverb import *  # noqa: F403
 from .restoration import *  # noqa: F403
 from .routing import *  # noqa: F403
 from .saturation import *  # noqa: F403
+from .song_analyst import *  # noqa: F403
 from .spatial import *  # noqa: F403
 from .spectral import *  # noqa: F403
 from .stereo import *  # noqa: F403

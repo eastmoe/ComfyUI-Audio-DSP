@@ -292,6 +292,15 @@
 | Audio Feature to Text | 音频特征转文本：输出 BPM、调性、响度和音色描述。 |
 | Beat Slicer | 节拍切片器：按瞬态生成切片时间段。 |
 | Audio Quality Estimator | 音频质量估算器：输出质量分数和明细。 |
+| Song Analysis to DSP Controls | 解析 ComfyUI-Song-Analyst 的 `analysis_json`，输出 BPM、调性、节拍、强拍和段落控制。 |
+| Song Key to Pitch Controls | 将 Song-Analyst 的 `C major` 等调性文本转换为音高校正控制。 |
+| Song Segment Selector | 根据 Song-Analyst 的 `SA_SEGMENTS` 或段落 JSON 裁剪音频。 |
+| Song Beat Grid Slicer | 根据 Song-Analyst 的 `beat_times` 和可选 `downbeats` 生成切片范围。 |
+
+Tempo-synced Delay、Click Track / Metronome、Rhythmic Gate / Stutter Sequencer、
+Step Sequencer、Pitch Correction 和 Polyphonic Pitch Correction 也新增了
+Song-Analyst 可选输入。这里仅使用软兼容类型名，本插件不会导入或强依赖
+ComfyUI-Song-Analyst。
 
 ## 目录结构
 
