@@ -5,6 +5,7 @@ from . import localization as loc
 from .delay import NOTE_VALUES
 from .equalizers import FILTER_TYPES, GRAPHIC_EQ_BANDS, HUM_BASE_MODES, LINEAR_PHASE_EQ_TYPES, SPECTRAL_SHAPER_MODES
 from .generators import NOISE_TYPES, OSCILLATOR_WAVES, SWEEP_MODES, WAVETABLES
+from .analysis import LOUDNESS_GRAPH_COLORS
 from .modulation import AUTO_FILTER_TYPES, MOD_SOURCE_WAVEFORMS, STUTTER_DIVISIONS, WAVEFORMS
 from .pitch_time import PITCH_KEYS, PITCH_SCALES
 from .restoration import DENOISER_METHODS
@@ -1635,6 +1636,33 @@ class ComfyAudioDSPLUFSMeter(_AudioDSPNode):
 
     def process(self, audio):
         return dsp.lufs_meter(audio)
+
+
+class ComfyAudioDSPLoudnessGraph:
+    CATEGORY = CATEGORY_METERING
+    RETURN_TYPES = ("IMAGE", "TENSOR")
+    RETURN_NAMES = loc.return_names("ComfyAudioDSPLoudnessGraph", ("loudness_graph", "time_series"))
+    FUNCTION = "process"
+    DESCRIPTION = loc.description("ComfyAudioDSPLoudnessGraph", "Plots an RMS or short-term LUFS time series and returns the underlying tensor.")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        section = "loudness_graph"
+        return {"required": {
+            "audio": _audio_input(section),
+            "mode": _combo(section, "mode", ["rms_envelope", "short_term_lufs"], "rms_envelope"),
+            "time_smoothing_s": _float(section, "time_smoothing_s", 0.4, 0.0, 10.0, 0.05),
+            "color_scheme": _combo(section, "color_scheme", LOUDNESS_GRAPH_COLORS, "cyan"),
+            "min_db": _float(section, "min_db", -60.0, -160.0, -1.0, 1.0),
+            "max_db": _float(section, "max_db", 0.0, -60.0, 24.0, 1.0),
+            "width": _int(section, "width", 960, 256, 4096, 16),
+            "height": _int(section, "height", 420, 192, 2160, 16),
+        }}
+
+    def process(self, audio, mode, time_smoothing_s, color_scheme, min_db, max_db, width, height):
+        if max_db <= min_db:
+            raise ValueError("max_db must be greater than min_db")
+        return dsp.loudness_graph(audio, mode, time_smoothing_s, color_scheme, min_db, max_db, width, height)
 
 
 class ComfyAudioDSPSpectralAnalyzer(_AudioDSPNode):
@@ -3275,6 +3303,7 @@ NODE_CLASS_MAPPINGS = {
     "ComfyAudioDSPRMSMeter": ComfyAudioDSPRMSMeter,
     "ComfyAudioDSPPeakMeter": ComfyAudioDSPPeakMeter,
     "ComfyAudioDSPLUFSMeter": ComfyAudioDSPLUFSMeter,
+    "ComfyAudioDSPLoudnessGraph": ComfyAudioDSPLoudnessGraph,
     "ComfyAudioDSPSpectralAnalyzer": ComfyAudioDSPSpectralAnalyzer,
     "ComfyAudioDSPSpectrogramVisualizer": ComfyAudioDSPSpectrogramVisualizer,
     "ComfyAudioDSPWaveformVisualizer": ComfyAudioDSPWaveformVisualizer,
@@ -3458,6 +3487,7 @@ _DISPLAY_FALLBACKS = {
     "ComfyAudioDSPRMSMeter": "RMS Meter",
     "ComfyAudioDSPPeakMeter": "Peak Meter",
     "ComfyAudioDSPLUFSMeter": "LUFS Meter",
+    "ComfyAudioDSPLoudnessGraph": "Loudness Graph",
     "ComfyAudioDSPSpectralAnalyzer": "Spectral Analyzer (FFT)",
     "ComfyAudioDSPSpectrogramVisualizer": "Spectrogram Visualizer",
     "ComfyAudioDSPWaveformVisualizer": "Waveform Visualizer",

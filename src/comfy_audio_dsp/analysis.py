@@ -5,6 +5,9 @@ import math
 
 import numpy as np
 import torch
+import torch.nn.functional as torch_functional
+import torchaudio
+from PIL import Image, ImageDraw
 from scipy import signal
 
 from .common import AUDIO_EPS, amp_to_db, audio_waveform, copy_audio
@@ -38,6 +41,143 @@ def _draw_polyline(canvas: np.ndarray, points: np.ndarray, color: tuple[float, f
         ys = np.linspace(y0, y1, steps + 1).astype(np.int32)
         mask = (xs >= 0) & (xs < width) & (ys >= 0) & (ys < height)
         canvas[ys[mask], xs[mask]] = color
+
+
+LOUDNESS_GRAPH_COLORS = ["cyan", "green", "amber", "magenta"]
+
+_LOUDNESS_GRAPH_PALETTES = {
+    "cyan": {"background": "#0b1018", "grid": "#273548", "line": "#42d9f5", "fill": "#123d4b", "text": "#d9f7ff"},
+    "green": {"background": "#0b1510", "grid": "#294033", "line": "#55e28a", "fill": "#173c27", "text": "#dcffe8"},
+    "amber": {"background": "#171109", "grid": "#493721", "line": "#ffbd4a", "fill": "#493015", "text": "#fff0cf"},
+    "magenta": {"background": "#160c17", "grid": "#482a4b", "line": "#f06ee8", "fill": "#462044", "text": "#ffe1fc"},
+}
+
+
+def _smooth_time_series(values: torch.Tensor, smoothing_frames: int) -> torch.Tensor:
+    smoothing_frames = max(1, int(smoothing_frames))
+    if smoothing_frames <= 1 or values.shape[-1] <= 1:
+        return values
+    kernel = torch.ones(1, 1, smoothing_frames, device=values.device, dtype=values.dtype) / smoothing_frames
+    pad_left = smoothing_frames // 2
+    pad_right = smoothing_frames - 1 - pad_left
+    padded = torch_functional.pad(values.unsqueeze(1), (pad_left, pad_right), mode="replicate")
+    return torch_functional.conv1d(padded, kernel).squeeze(1)
+
+
+def _loudness_graph_series(
+    waveform: torch.Tensor,
+    sample_rate: int,
+    mode: str,
+    time_smoothing_s: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    hop = max(1, int(round(0.1 * sample_rate)))
+    smoothing_s = max(0.0, float(time_smoothing_s))
+
+    if mode == "short_term_lufs":
+        frame = max(1, int(round(3.0 * sample_rate)))
+        if waveform.shape[-1] < frame:
+            framed_source = torch_functional.pad(waveform, (0, frame - waveform.shape[-1]))
+        else:
+            framed_source = waveform
+        frames = framed_source.unfold(-1, frame, hop)
+        loudness_transform = torchaudio.transforms.Loudness(sample_rate).to(waveform.device)
+        chunks = []
+        for start in range(0, frames.shape[-2], 32):
+            chunk = frames[:, :, start : start + 32, :]
+            chunk = chunk.permute(0, 2, 1, 3).reshape(-1, waveform.shape[1], frame)
+            measured = loudness_transform(chunk).reshape(waveform.shape[0], -1)
+            chunks.append(measured)
+        values = torch.cat(chunks, dim=-1)
+        first_center = min(waveform.shape[-1], frame) * 0.5 / sample_rate
+        times = first_center + torch.arange(values.shape[-1], device=waveform.device, dtype=waveform.dtype) * (hop / sample_rate)
+        values = _smooth_time_series(values, round(smoothing_s * sample_rate / hop))
+    else:
+        frame = max(1, int(round(max(0.02, smoothing_s) * sample_rate)))
+        if waveform.shape[-1] < frame:
+            framed_source = torch_functional.pad(waveform, (0, frame - waveform.shape[-1]))
+        else:
+            framed_source = waveform
+        channel_power = torch.mean(framed_source * framed_source, dim=1, keepdim=True)
+        power = torch_functional.avg_pool1d(channel_power, kernel_size=frame, stride=hop).squeeze(1)
+        values = 10.0 * torch.log10(torch.clamp(power, min=AUDIO_EPS))
+        times = (torch.arange(values.shape[-1], device=waveform.device, dtype=waveform.dtype) * hop + frame * 0.5) / sample_rate
+
+    values = torch.nan_to_num(values, nan=-160.0, neginf=-160.0, posinf=24.0).clamp(-160.0, 24.0)
+    return times, values
+
+
+def _draw_loudness_graph(
+    times: np.ndarray,
+    values: np.ndarray,
+    mode: str,
+    color_scheme: str,
+    min_db: float,
+    max_db: float,
+    width: int,
+    height: int,
+    duration_s: float,
+) -> torch.Tensor:
+    width = max(256, int(width))
+    height = max(192, int(height))
+    palette = _LOUDNESS_GRAPH_PALETTES.get(color_scheme, _LOUDNESS_GRAPH_PALETTES["cyan"])
+    image = Image.new("RGB", (width, height), palette["background"])
+    draw = ImageDraw.Draw(image)
+    left, top, right, bottom = 64, 34, width - 22, height - 46
+    plot_width = max(1, right - left)
+    plot_height = max(1, bottom - top)
+
+    draw.rectangle((left, top, right, bottom), outline=palette["grid"], width=1)
+    for index in range(6):
+        ratio = index / 5.0
+        y = round(top + ratio * plot_height)
+        level = max_db - ratio * (max_db - min_db)
+        draw.line((left, y, right, y), fill=palette["grid"], width=1)
+        draw.text((6, y - 7), f"{level:.0f}", fill=palette["text"])
+    duration = max(0.0, float(duration_s))
+    for index in range(5):
+        ratio = index / 4.0
+        x = round(left + ratio * plot_width)
+        draw.line((x, top, x, bottom), fill=palette["grid"], width=1)
+        draw.text((x - 12, bottom + 8), f"{duration * ratio:.1f}s", fill=palette["text"])
+
+    if len(values):
+        x_norm = times / max(duration, 1.0e-6)
+        y_norm = np.clip((values - min_db) / max(max_db - min_db, 1.0e-6), 0.0, 1.0)
+        points = [
+            (round(left + float(x) * plot_width), round(bottom - float(y) * plot_height))
+            for x, y in zip(x_norm, y_norm, strict=False)
+        ]
+        if len(points) == 1:
+            points.append((right, points[0][1]))
+        draw.polygon([(points[0][0], bottom), *points, (points[-1][0], bottom)], fill=palette["fill"])
+        draw.line(points, fill=palette["line"], width=3, joint="curve")
+
+    title = "RMS Envelope (dBFS)" if mode == "rms_envelope" else "Short-term Loudness (LUFS)"
+    draw.text((left, 10), title, fill=palette["text"])
+    draw.text((6, 10), "dB", fill=palette["text"])
+    array = np.asarray(image, dtype=np.float32) / 255.0
+    return torch.from_numpy(array).unsqueeze(0)
+
+
+def loudness_graph(
+    audio: dict,
+    mode: str,
+    time_smoothing_s: float,
+    color_scheme: str,
+    min_db: float,
+    max_db: float,
+    width: int,
+    height: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    waveform, sample_rate = audio_waveform(audio)
+    times, values = _loudness_graph_series(waveform, sample_rate, mode, time_smoothing_s)
+    graph_values = values.mean(dim=0).detach().cpu().numpy()
+    graph_times = times.detach().cpu().numpy()
+    duration_s = waveform.shape[-1] / sample_rate
+    image = _draw_loudness_graph(graph_times, graph_values, mode, color_scheme, float(min_db), float(max_db), width, height, duration_s)
+    time_column = times.view(1, -1, 1).expand(values.shape[0], -1, -1)
+    series = torch.cat([time_column, values.unsqueeze(-1)], dim=-1)
+    return image, series.detach().cpu()
 
 
 def _mono_np(audio: dict) -> tuple[np.ndarray, int]:

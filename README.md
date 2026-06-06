@@ -211,6 +211,7 @@ Right-click menu:
 | RMS Meter | RMS level in dBFS with channel details. |
 | Peak Meter | Peak level, overload flag, and channel details. |
 | LUFS Meter | Approximate integrated, short-term, momentary LUFS and LRA. |
+| Loudness Graph | Pillow-rendered RMS envelope or 3-second sliding short-term LUFS graph plus a `[batch, frame, (time_seconds, loudness)]` tensor. |
 | Spectral Analyzer (FFT) | FFT spectrum image plus sampled bin data. |
 | Spectrogram Visualizer | Spectrogram image for preview nodes. |
 | Waveform Visualizer | Waveform image for preview nodes. |

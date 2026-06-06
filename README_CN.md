@@ -211,6 +211,7 @@
 | RMS Meter | 显示 RMS 电平 dBFS 和通道明细。 |
 | Peak Meter | 显示峰值电平、过载状态和通道明细。 |
 | LUFS Meter | 近似整体、短时、瞬时 LUFS 和响度范围 LRA。 |
+| Loudness Graph | 使用 RMS 包络或 3 秒滑窗短时 LUFS 生成 Pillow 响度曲线图，并输出 `[批次, 帧, (时间秒, 响度)]` Tensor。 |
 | Spectral Analyzer (FFT) | 输出 FFT 频谱图片和采样频点数据。 |
 | Spectrogram Visualizer | 生成可连接预览节点的频谱图图片。 |
 | Waveform Visualizer | 生成可连接预览节点的波形图图片。 |

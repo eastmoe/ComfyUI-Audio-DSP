@@ -103,6 +103,7 @@
     "ComfyAudioDSPRMSMeter": "RMS 电平表",
     "ComfyAudioDSPPeakMeter": "峰值电平表",
     "ComfyAudioDSPLUFSMeter": "LUFS 响度表",
+    "ComfyAudioDSPLoudnessGraph": "响度曲线图",
     "ComfyAudioDSPSpectralAnalyzer": "频谱分析器 (FFT)",
     "ComfyAudioDSPSpectrogramVisualizer": "频谱图可视化",
     "ComfyAudioDSPWaveformVisualizer": "波形图可视化",
@@ -285,6 +286,7 @@
     "ComfyAudioDSPRMSMeter": "输出 RMS 电平 dBFS 和通道明细，不改变音频。",
     "ComfyAudioDSPPeakMeter": "输出峰值电平 dBFS、过载状态和通道明细。",
     "ComfyAudioDSPLUFSMeter": "输出近似整体、短时、瞬时 LUFS 和响度范围 LRA。",
+    "ComfyAudioDSPLoudnessGraph": "绘制 RMS 包络或短时 LUFS 曲线，并输出包含时间与响度值的 Tensor。",
     "ComfyAudioDSPSpectralAnalyzer": "生成 FFT 频谱图片，并输出采样后的频率/幅度数据。",
     "ComfyAudioDSPSpectrogramVisualizer": "生成可连接预览节点的频谱图图片。",
     "ComfyAudioDSPWaveformVisualizer": "生成可连接预览节点的波形图图片。",
@@ -467,6 +469,7 @@
     "ComfyAudioDSPRMSMeter": ["音频", "RMS dBFS", "明细"],
     "ComfyAudioDSPPeakMeter": ["音频", "峰值 dBFS", "过载", "明细"],
     "ComfyAudioDSPLUFSMeter": ["音频", "整体 LUFS", "短时 LUFS", "瞬时 LUFS", "LRA LU", "明细"],
+    "ComfyAudioDSPLoudnessGraph": ["响度曲线图", "时间序列"],
     "ComfyAudioDSPSpectralAnalyzer": ["音频", "频谱图片", "频谱数据"],
     "ComfyAudioDSPSpectrogramVisualizer": ["音频", "频谱图"],
     "ComfyAudioDSPWaveformVisualizer": ["音频", "波形图"],
@@ -1034,6 +1037,16 @@
       "beat_times": {"display_name": "节拍时间", "tooltip": "连接 Song-Analyst 的 SA_FLOAT_LIST beat_times 输出。"},
       "downbeats": {"display_name": "强拍标记", "tooltip": "连接 Song-Analyst 的 SA_INT_LIST downbeats 输出。"},
       "analysis_json": {"display_name": "分析 JSON", "tooltip": "可选连接 BPMBeatTracker 的 analysis_json。"}
+    },
+    "loudness_graph": {
+      "audio": {"display_name": "音频", "tooltip": "用于生成响度时间曲线的 ComfyUI 音频。"},
+      "mode": {"display_name": "响度模式", "tooltip": "RMS 包络使用 Torch 分帧能量；短时 LUFS 使用 3 秒滑动窗口 BS.1770 测量。"},
+      "time_smoothing_s": {"display_name": "时间平滑度 (秒)", "tooltip": "RMS 模式下控制能量窗口长度；短时 LUFS 模式下对测量序列继续做时间平滑，0 表示不额外平滑。"},
+      "color_scheme": {"display_name": "配色", "tooltip": "选择曲线、填充和背景配色。"},
+      "min_db": {"display_name": "图表最低 dB", "tooltip": "响度图纵轴下限。"},
+      "max_db": {"display_name": "图表最高 dB", "tooltip": "响度图纵轴上限，必须高于最低值。"},
+      "width": {"display_name": "图片宽度", "tooltip": "输出图片宽度（像素）。"},
+      "height": {"display_name": "图片高度", "tooltip": "输出图片高度（像素）。"}
     },
     "audio_mixer": {
       "track_1_gain_db": {"display_name": "轨道 1 增益 dB", "tooltip": "第 1 路输入增益。"},
